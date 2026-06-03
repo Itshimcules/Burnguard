@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.env
+token_governor.db
+*.sqlite
+*.sqlite3
