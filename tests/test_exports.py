@@ -6,7 +6,7 @@ from token_governor.models import UsageRecord, VirtualKey
 
 
 def _key(conn):
-    return create_virtual_key(conn, VirtualKey(None, "tg_sk_export", "Export", "analytics", ["gpt-4o-mini"], 5, 100, 1))
+    return create_virtual_key(conn, VirtualKey(None, "bg_sk_export", "Export", "analytics", ["gpt-4o-mini"], 5, 100, 1))
 
 
 def _record(key, request_id: str, session_id: str, status: str = "allowed", flags: list[str] | None = None, minutes_ago: int = 0):

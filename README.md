@@ -1,23 +1,29 @@
-# Token Governor
+# Burnguard
 
-**A tiny open-source gateway for metering shared LLM API usage before coding agents turn curiosity into invoices.**
+**Guardrails for shared LLM API usage.**
 
-Token Governor is a small open-source prototype for metering and observing shared LLM API usage.
+Burnguard is a small open-source prototype for metering shared AI API usage before coding agents turn curiosity into invoices.
 
-The goal is not to make AI bureaucracy. The goal is to make runaway token spend visible before it becomes a surprise invoice.
+**GitHub description:** Guardrails for shared LLM API usage before coding agents turn curiosity into invoices.
 
-Hopefully this category of tool becomes unnecessary because providers and coding tools make cost controls native. Until then, teams need a way to see who spent what, why it was spent, and when a session should have been stopped.
+It sits between AI tools and model providers, issuing local virtual keys, enforcing simple budgets, logging session-level usage, and flagging patterns like repeated prompts, large context, expensive model use, and possible agent loops.
+
+> **Design-phase prototype:** Burnguard is a working MVP, not a production security product. Use mock mode first, verify model pricing before real use, and treat the dashboard as a local observability prototype.
+
+Hopefully this category of tool is short-lived.
+
+In a better tooling world, providers and coding agents would make per-user budgets, session-level cost visibility, and runaway-loop protection native. Until then, teams need a practical way to see who spent what, why it was spent, and when a session should have stopped.
 
 ## Why this exists
 
 Coding agents are useful, but they can burn tokens in loops. Shared API accounts make the problem harder because a single provider key often hides which person, project, tool, or session caused the spend.
 
-Token Governor sits between clients and an OpenAI-compatible provider:
+Burnguard sits between clients and an OpenAI-compatible provider:
 
 ```text
 Client / Script / Coding Agent
         ↓
-Token Governor Gateway
+Burnguard Gateway
         ↓
 Provider API
 ```
@@ -27,12 +33,12 @@ It gives teams a local MVP for visibility, simple budgets, and session-level ins
 ## What the MVP does
 
 - Accepts OpenAI-compatible `POST /v1/chat/completions` requests.
-- Validates local virtual API keys such as `tg_sk_demo`.
+- Validates local virtual API keys such as `bg_sk_demo`.
 - Enforces daily, monthly, and max-single-request budgets.
 - Runs in **mock mode** by default so demos do not spend real API money.
 - Can forward to one OpenAI-compatible provider when configured.
 - Logs usage metadata to SQLite: owner, project, key, model, session, tokens, cost, status, route, latency, user-agent, category, and warning flags.
-- Tracks sessions using `X-Token-Governor-Session` or generates a session id automatically.
+- Tracks sessions using `X-Burnguard-Session` or generates a session id automatically.
 - Classifies requests with local heuristics only. No extra LLM is used.
 - Detects basic risk flags: repeated prompts, possible loops, large context, expensive models, budget-near-limit, high-cost requests, and test failure loops.
 - Shows a plain FastAPI/Jinja dashboard at `/`, `/keys`, `/sessions`, `/sessions/{session_id}`, and `/requests`.
@@ -77,9 +83,9 @@ Mock mode is enabled by default in `.env.example`, so this does not call a paid 
 
 ```bash
 curl http://localhost:8000/v1/chat/completions \
-  -H "Authorization: Bearer tg_sk_demo" \
+  -H "Authorization: Bearer bg_sk_demo" \
   -H "Content-Type: application/json" \
-  -H "X-Token-Governor-Session: demo-session-1" \
+  -H "X-Burnguard-Session: demo-session-1" \
   -d '{
     "model": "gpt-4o-mini",
     "messages": [
@@ -101,18 +107,18 @@ python -m token_governor create-key \
   --max-request 1
 ```
 
-You can also provide `--key tg_sk_my_key` and `--allowed-models gpt-4o-mini,gpt-4.1`.
+You can also provide `--key bg_sk_my_key` and `--allowed-models gpt-4o-mini,gpt-4.1`.
 
 ## Budget behavior
 
-Token Governor uses HTTP **402 Payment Required** when a request is blocked by policy.
+Burnguard uses HTTP **402 Payment Required** when a request is blocked by policy.
 
 Example response:
 
 ```json
 {
   "error": {
-    "message": "Request blocked by Token Governor budget policy.",
+    "message": "Request blocked by Burnguard budget policy.",
     "type": "budget_exceeded",
     "details": {
       "daily_budget_usd": 5.0,
@@ -128,7 +134,7 @@ Budgets are intentionally simple:
 - `monthly_budget_usd`
 - `max_single_request_usd`
 
-Before forwarding a request, Token Governor estimates input and expected output cost. After a provider response, it records final estimated cost from returned usage when available.
+Before forwarding a request, Burnguard estimates input and expected output cost. After a provider response, it records final estimated cost from returned usage when available.
 
 ## Pricing notes
 
@@ -144,9 +150,13 @@ Included sample entries:
 }
 ```
 
+## Streaming
+
+Streaming is intentionally not supported in this MVP. Requests with `"stream": true` are rejected with HTTP 400 and an `unsupported_feature` error instead of being forwarded to the provider.
+
 ## Privacy notes
 
-By default, Token Governor does **not** store full prompts or full responses.
+By default, Burnguard does **not** store full prompts or full responses.
 
 It stores:
 
@@ -169,8 +179,8 @@ If this is false, raw prompt and response bodies are not persisted. Previews are
 Copy `.env.example` to `.env` and edit as needed:
 
 ```env
-TOKEN_GOVERNOR_MODE=mock
-DATABASE_URL=sqlite:///./token_governor.db
+BURNGUARD_MODE=mock
+DATABASE_URL=sqlite:///./burnguard.db
 OPENAI_COMPATIBLE_BASE_URL=https://api.openai.com/v1
 OPENAI_COMPATIBLE_API_KEY=replace_me
 STORE_RAW_MESSAGES=false
@@ -185,7 +195,7 @@ LOOP_WINDOW_MINUTES=15
 To call a real OpenAI-compatible provider, set:
 
 ```env
-TOKEN_GOVERNOR_MODE=proxy
+BURNGUARD_MODE=proxy
 OPENAI_COMPATIBLE_BASE_URL=https://api.openai.com/v1
 OPENAI_COMPATIBLE_API_KEY=your_real_provider_key
 ```
@@ -215,15 +225,11 @@ You can filter exports with query parameters such as `session_id`, `owner`, `pro
 curl "http://localhost:8000/exports/requests.csv?session_id=codex-runaway-001&status=blocked"
 ```
 
-## Screenshot placeholders
+## Screenshot
 
-Add screenshots before publishing:
+The seeded dashboard is the pitch: it shows spend, top sessions, warning flags, a fake runaway coding-agent session, and a blocked request.
 
-```text
-docs/screenshots/overview.png
-docs/screenshots/session-detail.png
-docs/screenshots/blocked-request.png
-```
+![Burnguard seeded dashboard](docs/screenshots/overview.svg)
 
 ## Development
 
@@ -252,7 +258,7 @@ uvicorn token_governor.main:app --reload
 
 ## LinkedIn framing
 
-> I built a small open-source MVP called Token Governor.
+> I built a small open-source MVP called Burnguard.
 >
 > It is a lightweight LLM API gateway for shared API accounts. The goal is simple: show who is spending tokens, what project/session is spending them, and when a coding-agent workflow is starting to look expensive or stuck.
 >
@@ -262,7 +268,7 @@ uvicorn token_governor.main:app --reload
 >
 > But right now, a lot of teams are handing out API access and finding out later that agentic tools can burn through tokens fast.
 >
-> Token Governor is my prototype of the missing middle layer: virtual API keys, per-user/project budgets, session-level spend tracking, request classification, warning flags, and a simple local dashboard.
+> Burnguard is my prototype of the missing middle layer: virtual API keys, per-user/project budgets, session-level spend tracking, request classification, warning flags, and a simple local dashboard.
 >
 > It is not an enterprise product. It is a proof of concept for a problem I think more teams are about to run into.
 

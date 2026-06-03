@@ -3,13 +3,13 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "token-governor"
+name = "burnguard"
 version = "0.1.0"
-description = "A tiny open-source gateway for metering shared LLM API usage."
+description = "Guardrails for shared LLM API usage."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
-authors = [{name = "Token Governor Contributors"}]
+authors = [{name = "Burnguard Contributors"}]
 dependencies = [
   "fastapi>=0.111",
   "uvicorn[standard]>=0.29",

@@ -4,5 +4,6 @@ __pycache__/
 .venv/
 .env
 token_governor.db
+burnguard.db
 *.sqlite
 *.sqlite3

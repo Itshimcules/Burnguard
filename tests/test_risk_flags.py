@@ -7,7 +7,7 @@ from token_governor.risk_flags import compute_warning_flags
 
 
 def _key(conn):
-    return create_virtual_key(conn, VirtualKey(None, "tg_sk_risk", "Risk", "demo", ["gpt-4o-mini"], 5, 100, 1))
+    return create_virtual_key(conn, VirtualKey(None, "bg_sk_risk", "Risk", "demo", ["gpt-4o-mini"], 5, 100, 1))
 
 
 def _record(key, request_id, prompt_hash="same", category="general_chat"):

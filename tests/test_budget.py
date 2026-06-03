@@ -6,7 +6,7 @@ from token_governor.models import UsageRecord, VirtualKey
 
 
 def _key(conn, daily=1.0, monthly=10.0, max_request=1.0):
-    key = VirtualKey(None, "tg_sk_test", "Test", "demo", ["gpt-4o-mini", "gpt-4.1"], daily, monthly, max_request)
+    key = VirtualKey(None, "bg_sk_test", "Test", "demo", ["gpt-4o-mini", "gpt-4.1"], daily, monthly, max_request)
     return create_virtual_key(conn, key)
 
 
@@ -35,3 +35,25 @@ def test_budget_blocks_max_single_request(conn):
     decision = check_budget(conn, key, "gpt-4.1", 1_000_000, 1_000_000)
     assert not decision.allowed
     assert decision.reason == "max_single_request_exceeded"
+
+def test_budget_blocks_request_that_would_cross_daily_limit(conn):
+    init_db(conn)
+    key = _key(conn, daily=0.03, max_request=1.0)
+    insert_usage(conn, _record(key, 0.0299))
+
+    decision = check_budget(conn, key, "gpt-4o-mini", 1_000_000, 0)
+
+    assert not decision.allowed
+    assert decision.reason == "daily_budget_exceeded"
+
+
+def test_budget_blocks_request_that_would_cross_monthly_limit(conn):
+    init_db(conn)
+    key = _key(conn, daily=10.0, monthly=0.03, max_request=1.0)
+    insert_usage(conn, _record(key, 0.0299))
+
+    decision = check_budget(conn, key, "gpt-4o-mini", 1_000_000, 0)
+
+    assert not decision.allowed
+    assert decision.reason == "monthly_budget_exceeded"
+

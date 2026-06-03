@@ -27,7 +27,7 @@ def _bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     mode: str = "mock"
-    database_url: str = "sqlite:///./token_governor.db"
+    database_url: str = "sqlite:///./burnguard.db"
     openai_compatible_base_url: str = "https://api.openai.com/v1"
     openai_compatible_api_key: str = "replace_me"
     store_raw_messages: bool = False
@@ -55,8 +55,8 @@ def get_settings() -> Settings:
         item.strip() for item in os.getenv("EXPENSIVE_MODELS", "gpt-4.1,claude-sonnet").split(",") if item.strip()
     )
     return Settings(
-        mode=os.getenv("TOKEN_GOVERNOR_MODE", "mock"),
-        database_url=os.getenv("DATABASE_URL", "sqlite:///./token_governor.db"),
+        mode=os.getenv("BURNGUARD_MODE", os.getenv("TOKEN_GOVERNOR_MODE", "mock")),
+        database_url=os.getenv("DATABASE_URL", "sqlite:///./burnguard.db"),
         openai_compatible_base_url=os.getenv("OPENAI_COMPATIBLE_BASE_URL", "https://api.openai.com/v1"),
         openai_compatible_api_key=os.getenv("OPENAI_COMPATIBLE_API_KEY", "replace_me"),
         store_raw_messages=_bool("STORE_RAW_MESSAGES", False),

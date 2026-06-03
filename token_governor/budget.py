@@ -49,11 +49,13 @@ def check_budget(conn: sqlite3.Connection, virtual_key: VirtualKey, model: str, 
         "monthly_spend_usd": round(monthly_spend, 6),
         "max_single_request_usd": virtual_key.max_single_request_usd,
         "estimated_request_cost_usd": request_cost,
+        "daily_projected_spend_usd": round(daily_spend + request_cost, 6),
+        "monthly_projected_spend_usd": round(monthly_spend + request_cost, 6),
     }
     if request_cost > virtual_key.max_single_request_usd:
         return BudgetDecision(False, "max_single_request_exceeded", request_cost, daily_spend, monthly_spend, details)
-    if daily_spend >= virtual_key.daily_budget_usd:
+    if daily_spend + request_cost > virtual_key.daily_budget_usd:
         return BudgetDecision(False, "daily_budget_exceeded", request_cost, daily_spend, monthly_spend, details)
-    if monthly_spend >= virtual_key.monthly_budget_usd:
+    if monthly_spend + request_cost > virtual_key.monthly_budget_usd:
         return BudgetDecision(False, "monthly_budget_exceeded", request_cost, daily_spend, monthly_spend, details)
     return BudgetDecision(True, None, request_cost, daily_spend, monthly_spend, details)

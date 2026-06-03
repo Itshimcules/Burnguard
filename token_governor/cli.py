@@ -15,7 +15,7 @@ from .privacy import safe_preview, stable_hash
 
 def make_key(owner: str, project: str) -> str:
     slug = f"{owner}_{project}".lower().replace(" ", "_").replace("-", "_")
-    return f"tg_sk_{slug}_{uuid.uuid4().hex[:6]}"
+    return f"bg_sk_{slug}_{uuid.uuid4().hex[:6]}"
 
 
 def create_key(args: argparse.Namespace) -> None:
@@ -56,7 +56,7 @@ def _usage(
     category = classify_request(prompt)
     cost = estimate_cost(model, input_tokens, output_tokens)
     return UsageRecord(
-        request_id=f"tg_req_demo_{uuid.uuid4().hex}",
+        request_id=f"bg_req_demo_{uuid.uuid4().hex}",
         timestamp=datetime.now(timezone.utc) - timedelta(minutes=minutes_ago),
         virtual_key_id=key.id,
         virtual_key=key.key,
@@ -73,7 +73,7 @@ def _usage(
         block_reason=block_reason,
         latency_ms=random.randint(120, 1800),
         route_path="/v1/chat/completions",
-        user_agent="token-governor-demo/0.1",
+        user_agent="burnguard-demo/0.1",
         request_category=category,
         warning_flags=flags or [],
         prompt_hash=stable_hash(prompt),
@@ -86,9 +86,9 @@ def _usage(
 def seed_demo(_: argparse.Namespace) -> None:
     settings = get_settings()
     keys = [
-        VirtualKey(None, "tg_sk_demo", "Stephan", "demo", ["gpt-4o-mini", "gpt-4.1"], 5, 100, 1),
-        VirtualKey(None, "tg_sk_codex_project_a", "Codex Agent", "project-a", ["gpt-4o-mini", "gpt-4.1"], 3, 50, 0.75),
-        VirtualKey(None, "tg_sk_marketing_test", "Marketing", "content-test", ["gpt-4o-mini"], 2, 25, 0.25),
+        VirtualKey(None, "bg_sk_demo", "Stephan", "demo", ["gpt-4o-mini", "gpt-4.1"], 5, 100, 1),
+        VirtualKey(None, "bg_sk_codex_project_a", "Codex Agent", "project-a", ["gpt-4o-mini", "gpt-4.1"], 3, 50, 0.75),
+        VirtualKey(None, "bg_sk_marketing_test", "Marketing", "content-test", ["gpt-4o-mini"], 2, 25, 0.25),
     ]
     with connect(settings) as conn:
         init_db(conn)

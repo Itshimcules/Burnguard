@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Burnguard seeded dashboard overview</title>
+  <desc id="desc">Illustrative seeded dashboard showing spend, sessions, warning flags, runaway coding agent session, and a blocked request.</desc>
+  <rect width="1200" height="720" fill="#f7f3eb"/>
+  <rect width="1200" height="74" fill="#211a16"/>
+  <text x="36" y="34" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="700" fill="#fff7ed">Burnguard</text>
+  <text x="36" y="56" font-family="Inter, Arial, sans-serif" font-size="14" fill="#d6c7b7">meter shared LLM API usage before coding agents turn curiosity into invoices</text>
+  <text x="1010" y="43" font-family="Inter, Arial, sans-serif" font-size="14" fill="#ffd7aa">Overview  Keys  Sessions  Requests</text>
+
+  <text x="36" y="126" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700" fill="#1f2933">Overview</text>
+
+  <g font-family="Inter, Arial, sans-serif">
+    <g transform="translate(36 154)">
+      <rect width="350" height="118" rx="14" fill="#fffaf3" stroke="#ead9c5"/>
+      <text x="24" y="38" font-size="16" fill="#77675a">Total today</text>
+      <text x="24" y="88" font-size="38" font-weight="700" fill="#1f2933">$0.58</text>
+    </g>
+    <g transform="translate(425 154)">
+      <rect width="350" height="118" rx="14" fill="#fffaf3" stroke="#ead9c5"/>
+      <text x="24" y="38" font-size="16" fill="#77675a">Total this month</text>
+      <text x="24" y="88" font-size="38" font-weight="700" fill="#1f2933">$0.58</text>
+    </g>
+    <g transform="translate(814 154)">
+      <rect width="350" height="118" rx="14" fill="#fffaf3" stroke="#ead9c5"/>
+      <text x="24" y="38" font-size="16" fill="#77675a">Requests today</text>
+      <text x="24" y="88" font-size="38" font-weight="700" fill="#1f2933">16</text>
+    </g>
+  </g>
+
+  <g font-family="Inter, Arial, sans-serif" font-size="15">
+    <g transform="translate(36 304)">
+      <rect width="545" height="178" rx="14" fill="#fffaf3" stroke="#ead9c5"/>
+      <text x="22" y="34" font-size="22" font-weight="700" fill="#1f2933">Top sessions</text>
+      <line x1="22" y1="52" x2="523" y2="52" stroke="#ead9c5"/>
+      <text x="22" y="82" fill="#a33b12" font-weight="700">codex-runaway-001</text><text x="340" y="82" fill="#1f2933">13 req</text><text x="455" y="82" fill="#1f2933">$0.57</text>
+      <text x="22" y="118" fill="#a33b12">demo-session-1</text><text x="340" y="118" fill="#1f2933">2 req</text><text x="455" y="118" fill="#1f2933">$0.00</text>
+      <text x="22" y="154" fill="#a33b12">content-demo-1</text><text x="340" y="154" fill="#1f2933">1 req</text><text x="455" y="154" fill="#1f2933">$0.00</text>
+    </g>
+
+    <g transform="translate(619 304)">
+      <rect width="545" height="178" rx="14" fill="#fffaf3" stroke="#ead9c5"/>
+      <text x="22" y="34" font-size="22" font-weight="700" fill="#1f2933">Warning flags</text>
+      <line x1="22" y1="52" x2="523" y2="52" stroke="#ead9c5"/>
+      <rect x="22" y="68" width="106" height="26" rx="13" fill="#fee2e2"/><text x="35" y="86" fill="#991b1b" font-size="13">possible_loop</text>
+      <rect x="136" y="68" width="116" height="26" rx="13" fill="#fee2e2"/><text x="149" y="86" fill="#991b1b" font-size="13">repeated_prompt</text>
+      <rect x="260" y="68" width="116" height="26" rx="13" fill="#fee2e2"/><text x="273" y="86" fill="#991b1b" font-size="13">large_context</text>
+      <rect x="22" y="110" width="124" height="26" rx="13" fill="#fee2e2"/><text x="35" y="128" fill="#991b1b" font-size="13">expensive_model</text>
+      <rect x="154" y="110" width="128" height="26" rx="13" fill="#fee2e2"/><text x="167" y="128" fill="#991b1b" font-size="13">test_failure_loop</text>
+    </g>
+
+    <g transform="translate(36 516)">
+      <rect width="1128" height="148" rx="14" fill="#fffaf3" stroke="#ead9c5"/>
+      <text x="22" y="34" font-size="22" font-weight="700" fill="#1f2933">Blocked requests</text>
+      <line x1="22" y1="52" x2="1106" y2="52" stroke="#ead9c5"/>
+      <text x="22" y="84" fill="#77675a">Time</text><text x="220" y="84" fill="#77675a">Session</text><text x="520" y="84" fill="#77675a">Reason</text><text x="890" y="84" fill="#77675a">Model</text>
+      <text x="22" y="120" fill="#1f2933">2026-06-03T12:05Z</text><text x="220" y="120" fill="#a33b12" font-weight="700">codex-runaway-001</text><text x="520" y="120" fill="#991b1b">max_single_request_exceeded</text><text x="890" y="120" fill="#1f2933">gpt-4.1</text>
+    </g>
+  </g>
+</svg>

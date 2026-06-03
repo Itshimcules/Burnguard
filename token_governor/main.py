@@ -21,11 +21,12 @@ from .exports import ExportFilters, REQUEST_EXPORT_COLUMNS, SESSION_EXPORT_COLUM
 from .models import UsageRecord
 from .pricing import estimate_cost
 from .privacy import safe_preview, stable_hash
+from .compat import is_streaming_request
 from .proxy import estimate_message_tokens, forward_chat_completion
 from .risk_flags import compute_warning_flags
 
 settings = get_settings()
-app = FastAPI(title="Token Governor", description="Metered LLM API gateway MVP", version="0.1.0")
+app = FastAPI(title="Burnguard", description="Guardrails for shared LLM API usage", version="0.1.0")
 package_dir = Path(__file__).parent
 templates = Jinja2Templates(directory=str(package_dir / "templates"))
 app.mount("/static", StaticFiles(directory=str(package_dir / "static")), name="static")
@@ -99,15 +100,26 @@ def _month_start() -> str:
 async def chat_completions(
     request: Request,
     authorization: str | None = Header(default=None, alias="Authorization"),
-    session_header: str | None = Header(default=None, alias="X-Token-Governor-Session"),
+    session_header: str | None = Header(default=None, alias="X-Burnguard-Session"),
+    legacy_session_header: str | None = Header(default=None, alias="X-Token-Governor-Session"),
     user_agent: str | None = Header(default=None, alias="User-Agent"),
 ) -> JSONResponse:
     started = time.perf_counter()
-    request_id = f"tg_req_{uuid.uuid4().hex}"
+    request_id = f"bg_req_{uuid.uuid4().hex}"
     payload = await request.json()
+    if is_streaming_request(payload):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": {
+                    "message": "Streaming is not supported in this MVP.",
+                    "type": "unsupported_feature",
+                }
+            },
+        )
     model = payload.get("model", "unknown")
     messages = payload.get("messages", [])
-    session_id = session_header or f"session_{uuid.uuid4().hex[:12]}"
+    session_id = session_header or legacy_session_header or f"session_{uuid.uuid4().hex[:12]}"
     prompt_hash = stable_hash(messages)
     category = classify_request(messages)
     input_tokens = estimate_message_tokens(messages)
@@ -196,7 +208,7 @@ async def chat_completions(
                 status_code=402,
                 content={
                     "error": {
-                        "message": "Request blocked by Token Governor budget policy.",
+                        "message": "Request blocked by Burnguard budget policy.",
                         "type": "budget_exceeded",
                         "details": decision.details,
                     }
@@ -351,7 +363,7 @@ def export_requests_csv(
     return Response(
         content=to_csv(rows, REQUEST_EXPORT_COLUMNS),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=token-governor-requests.csv"},
+        headers={"Content-Disposition": "attachment; filename=burnguard-requests.csv"},
     )
 
 
@@ -385,6 +397,6 @@ def export_sessions_csv(
     return Response(
         content=to_csv(rows, SESSION_EXPORT_COLUMNS),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=token-governor-sessions.csv"},
+        headers={"Content-Disposition": "attachment; filename=burnguard-sessions.csv"},
     )
 
