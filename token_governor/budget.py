@@ -42,18 +42,22 @@ def check_budget(conn: sqlite3.Connection, virtual_key: VirtualKey, model: str, 
     month_start, month_end = month_bounds()
     daily_spend = spend_between(conn, virtual_key.id or -1, day_start, day_end)
     monthly_spend = spend_between(conn, virtual_key.id or -1, month_start, month_end)
+    projected_daily_spend = daily_spend + request_cost
+    projected_monthly_spend = monthly_spend + request_cost
     details = {
         "daily_budget_usd": virtual_key.daily_budget_usd,
         "daily_spend_usd": round(daily_spend, 6),
+        "projected_daily_spend_usd": round(projected_daily_spend, 6),
         "monthly_budget_usd": virtual_key.monthly_budget_usd,
         "monthly_spend_usd": round(monthly_spend, 6),
+        "projected_monthly_spend_usd": round(projected_monthly_spend, 6),
         "max_single_request_usd": virtual_key.max_single_request_usd,
         "estimated_request_cost_usd": request_cost,
     }
     if request_cost > virtual_key.max_single_request_usd:
         return BudgetDecision(False, "max_single_request_exceeded", request_cost, daily_spend, monthly_spend, details)
-    if daily_spend >= virtual_key.daily_budget_usd:
+    if projected_daily_spend > virtual_key.daily_budget_usd:
         return BudgetDecision(False, "daily_budget_exceeded", request_cost, daily_spend, monthly_spend, details)
-    if monthly_spend >= virtual_key.monthly_budget_usd:
+    if projected_monthly_spend > virtual_key.monthly_budget_usd:
         return BudgetDecision(False, "monthly_budget_exceeded", request_cost, daily_spend, monthly_spend, details)
     return BudgetDecision(True, None, request_cost, daily_spend, monthly_spend, details)

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Burnguard social card</title>
+  <desc id="desc">A social preview card describing Burnguard as guardrails for shared LLM API usage.</desc>
+  
+  <rect width="1200" height="630" fill="white"/>
+  <circle cx="1140" cy="0" r="230" fill="#fff0e8"/>
+  <circle cx="60" cy="620" r="190" fill="#eef3f7"/>
+  <rect x="70" y="72" width="1060" height="488" rx="30" fill="white" stroke="#dbe3eb" stroke-width="2"/>
+  <g transform="translate(140 125) scale(.32)">
+  <rect width="1000" height="760" fill="white"/>
+  <g transform="translate(350 80) scale(1.5)">
+<g id="burnguard-mark" fill="none" stroke-linejoin="round" stroke-linecap="round">
+  <path d="M100 20 L160 60 L160 122 C160 176 130 218 100 236 C70 218 40 176 40 122 L40 60 Z" fill="#132637"/>
+  <path d="M62 75 L100 96 L138 75 L138 119 C138 151 122 171 107 181 C124 161 126 139 126 104 L100 118 L74 104 C74 139 76 161 93 181 C78 171 62 151 62 119 Z" fill="white"/>
+  <path d="M64 124 C76 146 98 160 124 174 C114 197 100 211 100 224 C92 206 74 188 52 176 C42 153 36 131 36 98 L58 90 L58 109 C58 141 72 165 94 184 C89 165 96 150 114 139 C99 133 83 126 64 114 Z" fill="white" opacity=".98"/>
+  <path d="M84 88 C90 91 96 92 102 91 L101 102 C93 102 87 100 84 97 Z" fill="#132637"/>
+  <path d="M116 88 C110 91 104 92 98 91 L99 102 C107 102 113 100 116 97 Z" fill="#132637"/>
+  <path d="M100 224 C99 203 106 185 123 172 C131 165 136 156 140 145 C147 159 146 177 137 193 C127 208 113 216 100 224 Z" fill="#ff5a14"/>
+</g>
+</g>
+  <text x="105" y="610" font-family="Inter, Arial, sans-serif" font-size="126" font-weight="800" letter-spacing="-6">
+    <tspan fill="#ff5a14">Burn</tspan><tspan fill="#132637">guard</tspan>
+  </text>
+  <text x="272" y="690" fill="#132637" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="700" letter-spacing="14">GUARDRAILS FOR AI USAGE</text>
+</g>
+  <text x="570" y="200" fill="#132637" font-family="Inter, Arial, sans-serif" font-size="50" font-weight="800">Guardrails for</text>
+  <text x="570" y="262" fill="#132637" font-family="Inter, Arial, sans-serif" font-size="50" font-weight="800">shared LLM API usage</text>
+  <rect x="570" y="282" width="410" height="11" rx="6" fill="#ff5a14"/>
+  <text x="570" y="367" fill="#657381" font-family="Inter, Arial, sans-serif" font-size="30">Meter usage before coding agents turn</text>
+  <text x="570" y="401" fill="#657381" font-family="Inter, Arial, sans-serif" font-size="30">curiosity into invoices.</text>
+  <g font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" fill="#132637">
+    <rect x="570" y="456" width="168" height="42" rx="14" fill="#f8fafc" stroke="#ccd6df"/><text x="586" y="485">Virtual keys</text>
+    <rect x="752" y="456" width="126" height="42" rx="14" fill="#f8fafc" stroke="#ccd6df"/><text x="769" y="485">Budgets</text>
+    <rect x="894" y="456" width="132" height="42" rx="14" fill="#f8fafc" stroke="#ccd6df"/><text x="916" y="485">Sessions</text>
+    <rect x="1040" y="456" width="102" height="42" rx="14" fill="#f8fafc" stroke="#ccd6df"/><text x="1057" y="485">Alerts</text>
+  </g>
+
+</svg>

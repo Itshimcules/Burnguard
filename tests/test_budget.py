@@ -35,3 +35,29 @@ def test_budget_blocks_max_single_request(conn):
     decision = check_budget(conn, key, "gpt-4.1", 1_000_000, 1_000_000)
     assert not decision.allowed
     assert decision.reason == "max_single_request_exceeded"
+
+
+def test_budget_blocks_request_that_would_exceed_daily_budget(conn):
+    init_db(conn)
+    key = _key(conn, daily=5.0, monthly=100.0, max_request=10.0)
+    insert_usage(conn, _record(key, 4.99))
+
+    decision = check_budget(conn, key, "gpt-4.1", 100_000, 100_000)
+
+    assert not decision.allowed
+    assert decision.reason == "daily_budget_exceeded"
+    assert decision.details["daily_spend_usd"] == 4.99
+    assert decision.details["projected_daily_spend_usd"] > decision.details["daily_budget_usd"]
+
+
+def test_budget_blocks_request_that_would_exceed_monthly_budget(conn):
+    init_db(conn)
+    key = _key(conn, daily=100.0, monthly=5.0, max_request=10.0)
+    insert_usage(conn, _record(key, 4.99))
+
+    decision = check_budget(conn, key, "gpt-4.1", 100_000, 100_000)
+
+    assert not decision.allowed
+    assert decision.reason == "monthly_budget_exceeded"
+    assert decision.details["monthly_spend_usd"] == 4.99
+    assert decision.details["projected_monthly_spend_usd"] > decision.details["monthly_budget_usd"]

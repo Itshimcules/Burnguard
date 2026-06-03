@@ -24,7 +24,7 @@ from .proxy import estimate_message_tokens, forward_chat_completion
 from .risk_flags import compute_warning_flags
 
 settings = get_settings()
-app = FastAPI(title="Token Governor", description="Metered LLM API gateway MVP", version="0.1.0")
+app = FastAPI(title="Burnguard", description="Guardrails for shared LLM API usage", version="0.1.0")
 package_dir = Path(__file__).parent
 templates = Jinja2Templates(directory=str(package_dir / "templates"))
 app.mount("/static", StaticFiles(directory=str(package_dir / "static")), name="static")
@@ -86,6 +86,17 @@ async def chat_completions(
     started = time.perf_counter()
     request_id = f"tg_req_{uuid.uuid4().hex}"
     payload = await request.json()
+    if payload.get("stream") is True:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": {
+                    "message": "Streaming is not supported in this MVP.",
+                    "type": "unsupported_feature",
+                }
+            },
+        )
+
     model = payload.get("model", "unknown")
     messages = payload.get("messages", [])
     session_id = session_header or f"session_{uuid.uuid4().hex[:12]}"
@@ -177,7 +188,7 @@ async def chat_completions(
                 status_code=402,
                 content={
                     "error": {
-                        "message": "Request blocked by Token Governor budget policy.",
+                        "message": "Request blocked by Burnguard budget policy.",
                         "type": "budget_exceeded",
                         "details": decision.details,
                     }
