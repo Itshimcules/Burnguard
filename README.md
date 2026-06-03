@@ -198,16 +198,6 @@ OPENAI_COMPATIBLE_API_KEY=your_real_provider_key
 - `/sessions/{session_id}` — session detail, repeated prompts, category breakdown, flags, timeline
 - `/requests` — recent request log
 
-## Screenshot placeholders
-
-Add screenshots before publishing:
-
-```text
-docs/screenshots/overview.png
-docs/screenshots/session-detail.png
-docs/screenshots/blocked-request.png
-```
-
 ## Development
 
 ```bash
@@ -232,22 +222,6 @@ uvicorn token_governor.main:app --reload
 - hosted dashboard mode
 - export to CSV/JSON
 - Prometheus/OpenTelemetry support
-
-## LinkedIn framing
-
-> I built a small open-source MVP called Token Governor.
->
-> It is a lightweight LLM API gateway for shared API accounts. The goal is simple: show who is spending tokens, what project/session is spending them, and when a coding-agent workflow is starting to look expensive or stuck.
->
-> Hopefully this kind of tool is short-lived.
->
-> In a better version of the AI tooling world, every provider and coding agent would include clear per-user budgets, session-level cost visibility, and runaway-loop protection by default.
->
-> But right now, a lot of teams are handing out API access and finding out later that agentic tools can burn through tokens fast.
->
-> Token Governor is my prototype of the missing middle layer: virtual API keys, per-user/project budgets, session-level spend tracking, request classification, warning flags, and a simple local dashboard.
->
-> It is not an enterprise product. It is a proof of concept for a problem I think more teams are about to run into.
 
 ## License
 
