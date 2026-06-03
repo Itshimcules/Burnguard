@@ -12,11 +12,21 @@ In a better tooling world, providers and coding agents would make per-user budge
 
 > **Design phase / working prototype:** Burnguard is intentionally small and local-first. Treat the current implementation as an MVP for exploration, demos, and feedback rather than production infrastructure.
 
-## Dashboard preview
+![Burnguard banner](docs/assets/brand/burnguard-banner.svg)
 
-![Burnguard seeded dashboard preview](docs/dashboard-preview.svg)
+## Visual assets
 
-Run `python -m token_governor seed-demo` and start the app to populate a dashboard with normal usage, a fake runaway session, warning flags, and blocked requests.
+Burnguard includes repo-ready brand and explainer assets under `docs/assets/brand/`:
+
+- [`burnguard-logo.svg`](docs/assets/brand/burnguard-logo.svg) — full logo and tagline.
+- [`burnguard-mark.svg`](docs/assets/brand/burnguard-mark.svg) — shield/owl mark for favicons, avatars, and small UI treatments.
+- [`burnguard-banner.svg`](docs/assets/brand/burnguard-banner.svg) — wide repository or social header.
+- [`burnguard-social-card.svg`](docs/assets/brand/burnguard-social-card.svg) — Open Graph-style preview card.
+- [`burnguard-app-icon.svg`](docs/assets/brand/burnguard-app-icon.svg) — square app/repo icon.
+- [`burnguard-request-flow.svg`](docs/assets/brand/burnguard-request-flow.svg) — request lifecycle explainer.
+- [`burnguard-architecture.svg`](docs/assets/brand/burnguard-architecture.svg) — high-level architecture diagram.
+
+Run `python -m token_governor seed-demo` and start the app to populate the dashboard with normal usage, a fake runaway session, warning flags, and blocked requests.
 
 ## Why this exists
 
@@ -31,6 +41,10 @@ Burnguard Gateway
         ↓
 Provider API
 ```
+
+![Burnguard architecture](docs/assets/brand/burnguard-architecture.svg)
+
+![Burnguard request flow](docs/assets/brand/burnguard-request-flow.svg)
 
 It gives teams a local MVP for visibility, simple budgets, and session-level inspection without building an enterprise platform.
 

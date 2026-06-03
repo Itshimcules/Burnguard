@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-labelledby="title desc">
+  <title id="title">Burnguard app icon</title>
+  <desc id="desc">An app icon card with the Burnguard shield and wordmark.</desc>
+  
+  <rect width="800" height="800" fill="white"/>
+  <rect x="72" y="42" width="656" height="688" rx="118" fill="white" stroke="#e2e8ee" stroke-width="8"/>
+  <g transform="translate(230 120) scale(1.7)">
+<g id="burnguard-mark" fill="none" stroke-linejoin="round" stroke-linecap="round">
+  <path d="M100 20 L160 60 L160 122 C160 176 130 218 100 236 C70 218 40 176 40 122 L40 60 Z" fill="#132637"/>
+  <path d="M62 75 L100 96 L138 75 L138 119 C138 151 122 171 107 181 C124 161 126 139 126 104 L100 118 L74 104 C74 139 76 161 93 181 C78 171 62 151 62 119 Z" fill="white"/>
+  <path d="M64 124 C76 146 98 160 124 174 C114 197 100 211 100 224 C92 206 74 188 52 176 C42 153 36 131 36 98 L58 90 L58 109 C58 141 72 165 94 184 C89 165 96 150 114 139 C99 133 83 126 64 114 Z" fill="white" opacity=".98"/>
+  <path d="M84 88 C90 91 96 92 102 91 L101 102 C93 102 87 100 84 97 Z" fill="#132637"/>
+  <path d="M116 88 C110 91 104 92 98 91 L99 102 C107 102 113 100 116 97 Z" fill="#132637"/>
+  <path d="M100 224 C99 203 106 185 123 172 C131 165 136 156 140 145 C147 159 146 177 137 193 C127 208 113 216 100 224 Z" fill="#ff5a14"/>
+</g>
+</g>
+  <text x="400" y="672" text-anchor="middle" fill="#132637" font-family="Inter, Arial, sans-serif" font-size="74" font-weight="800">Burnguard</text>
+
+</svg>

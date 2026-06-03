@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title desc">
+  <title id="title">Burnguard architecture</title>
+  <desc id="desc">Architecture diagram showing AI tools sending requests through Burnguard to providers.</desc>
+  
+  <rect width="1400" height="850" fill="white"/>
+  <text x="700" y="95" text-anchor="middle" fill="#132637" font-family="Inter, Arial, sans-serif" font-size="58" font-weight="800">Burnguard architecture</text>
+  <text x="700" y="134" text-anchor="middle" fill="#657381" font-family="Inter, Arial, sans-serif" font-size="30">A lightweight gateway between AI tools and model providers</text>
+  <rect x="90" y="278" width="310" height="198" rx="22" fill="white" stroke="#ccd6df" stroke-width="2"/>
+  <text x="245" y="340" text-anchor="middle" fill="#132637" font-family="Inter, Arial, sans-serif" font-size="32" font-weight="800">AI tools</text>
+  <text x="245" y="388" text-anchor="middle" fill="#657381" font-family="Inter, Arial, sans-serif" font-size="24">Codex</text>
+  <text x="245" y="418" text-anchor="middle" fill="#657381" font-family="Inter, Arial, sans-serif" font-size="24">Claude Code</text>
+  <text x="245" y="448" text-anchor="middle" fill="#657381" font-family="Inter, Arial, sans-serif" font-size="24">Internal apps</text>
+  <path d="M400 376 H520" stroke="#ff5a14" stroke-width="5"/><path d="M520 376 L500 364 V388 Z" fill="#ff5a14"/>
+  <rect x="520" y="238" width="360" height="278" rx="22" fill="#fbfdff" stroke="#132637" stroke-width="2"/>
+  <g transform="translate(645 252) scale(.58)">
+<g id="burnguard-mark" fill="none" stroke-linejoin="round" stroke-linecap="round">
+  <path d="M100 20 L160 60 L160 122 C160 176 130 218 100 236 C70 218 40 176 40 122 L40 60 Z" fill="#132637"/>
+  <path d="M62 75 L100 96 L138 75 L138 119 C138 151 122 171 107 181 C124 161 126 139 126 104 L100 118 L74 104 C74 139 76 161 93 181 C78 171 62 151 62 119 Z" fill="white"/>
+  <path d="M64 124 C76 146 98 160 124 174 C114 197 100 211 100 224 C92 206 74 188 52 176 C42 153 36 131 36 98 L58 90 L58 109 C58 141 72 165 94 184 C89 165 96 150 114 139 C99 133 83 126 64 114 Z" fill="white" opacity=".98"/>
+  <path d="M84 88 C90 91 96 92 102 91 L101 102 C93 102 87 100 84 97 Z" fill="#132637"/>
+  <path d="M116 88 C110 91 104 92 98 91 L99 102 C107 102 113 100 116 97 Z" fill="#132637"/>
+  <path d="M100 224 C99 203 106 185 123 172 C131 165 136 156 140 145 C147 159 146 177 137 193 C127 208 113 216 100 224 Z" fill="#ff5a14"/>
+</g>
+</g>
+  <text x="700" y="299" text-anchor="middle" fill="#132637" font-family="Inter, Arial, sans-serif" font-size="32" font-weight="800">Burnguard</text>
+  <text x="700" y="350" text-anchor="middle" fill="#657381" font-family="Inter, Arial, sans-serif" font-size="24">Virtual keys • budgets</text>
+  <text x="700" y="380" text-anchor="middle" fill="#657381" font-family="Inter, Arial, sans-serif" font-size="24">Session logs • risk flags</text>
+  <text x="700" y="410" text-anchor="middle" fill="#657381" font-family="Inter, Arial, sans-serif" font-size="24">Provider routing</text>
+  <path d="M880 376 H1000" stroke="#ff5a14" stroke-width="5"/><path d="M1000 376 L980 364 V388 Z" fill="#ff5a14"/>
+  <rect x="1000" y="278" width="310" height="198" rx="22" fill="white" stroke="#ccd6df" stroke-width="2"/>
+  <text x="1155" y="340" text-anchor="middle" fill="#132637" font-family="Inter, Arial, sans-serif" font-size="32" font-weight="800">Providers</text>
+  <text x="1155" y="388" text-anchor="middle" fill="#657381" font-family="Inter, Arial, sans-serif" font-size="24">OpenAI-compatible APIs</text>
+  <text x="1155" y="418" text-anchor="middle" fill="#657381" font-family="Inter, Arial, sans-serif" font-size="24">Anthropic</text>
+  <text x="1155" y="448" text-anchor="middle" fill="#657381" font-family="Inter, Arial, sans-serif" font-size="24">OpenRouter / local models</text>
+  <g font-family="Inter, Arial, sans-serif" text-anchor="middle">
+    <rect x="150" y="622" width="250" height="118" rx="18" fill="#fff0e8" stroke="#ffc9b4" stroke-width="2"/><text x="275" y="684" fill="#132637" font-size="30" font-weight="800">Meter</text><text x="275" y="734" fill="#657381" font-size="22">who spent what</text>
+    <rect x="430" y="622" width="250" height="118" rx="18" fill="#fff0e8" stroke="#ffc9b4" stroke-width="2"/><text x="555" y="684" fill="#132637" font-size="30" font-weight="800">Control</text><text x="555" y="734" fill="#657381" font-size="22">budget limits</text>
+    <rect x="710" y="622" width="250" height="118" rx="18" fill="#fff0e8" stroke="#ffc9b4" stroke-width="2"/><text x="835" y="684" fill="#132637" font-size="30" font-weight="800">Explain</text><text x="835" y="734" fill="#657381" font-size="22">session categories</text>
+    <rect x="990" y="622" width="250" height="118" rx="18" fill="#fff0e8" stroke="#ffc9b4" stroke-width="2"/><text x="1115" y="684" fill="#132637" font-size="30" font-weight="800">Warn</text><text x="1115" y="734" fill="#657381" font-size="22">loops and waste</text>
+  </g>
+
+</svg>

@@ -3,6 +3,8 @@ body { margin: 0; }
 a { color: #a33b12; text-decoration: none; }
 a:hover { text-decoration: underline; }
 .topbar { display: flex; justify-content: space-between; gap: 1rem; align-items: center; padding: 1rem 2rem; background: #211a16; color: #fff7ed; }
+.brand { display: flex; align-items: center; gap: .75rem; }
+.brand-mark { width: 42px; height: 42px; border-radius: 10px; background: #fff; padding: .2rem; }
 .topbar nav { display: flex; gap: 1rem; flex-wrap: wrap; }
 .topbar a { color: #ffd7aa; }
 .tagline { display: block; color: #d6c7b7; font-size: .9rem; margin-top: .25rem; }
