@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Burnguard seeded dashboard preview</title>
+  <desc id="desc">Mock dashboard preview with spend totals, top sessions, warning flags, and blocked requests.</desc>
+  <rect width="1200" height="760" fill="#0f172a"/>
+  <rect x="0" y="0" width="1200" height="72" fill="#111827"/>
+  <text x="42" y="44" fill="#f97316" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Burnguard</text>
+  <text x="196" y="44" fill="#cbd5e1" font-family="Inter, Arial, sans-serif" font-size="16">meter shared LLM API usage before coding agents turn curiosity into invoices</text>
+  <text x="42" y="122" fill="#f8fafc" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="700">Overview</text>
+
+  <g font-family="Inter, Arial, sans-serif">
+    <rect x="42" y="154" width="352" height="118" rx="18" fill="#1e293b" stroke="#334155"/>
+    <text x="70" y="196" fill="#94a3b8" font-size="18">Total today</text>
+    <text x="70" y="240" fill="#f8fafc" font-size="38" font-weight="700">$4.87</text>
+
+    <rect x="424" y="154" width="352" height="118" rx="18" fill="#1e293b" stroke="#334155"/>
+    <text x="452" y="196" fill="#94a3b8" font-size="18">Total this month</text>
+    <text x="452" y="240" fill="#f8fafc" font-size="38" font-weight="700">$38.42</text>
+
+    <rect x="806" y="154" width="352" height="118" rx="18" fill="#1e293b" stroke="#334155"/>
+    <text x="834" y="196" fill="#94a3b8" font-size="18">Requests today</text>
+    <text x="834" y="240" fill="#f8fafc" font-size="38" font-weight="700">127</text>
+
+    <rect x="42" y="304" width="545" height="226" rx="18" fill="#1e293b" stroke="#334155"/>
+    <text x="70" y="346" fill="#f8fafc" font-size="24" font-weight="700">Top sessions</text>
+    <text x="70" y="392" fill="#f97316" font-size="18">runaway-refactor-loop</text>
+    <text x="424" y="392" fill="#cbd5e1" font-size="18">44 req</text>
+    <text x="512" y="392" fill="#f8fafc" font-size="18" text-anchor="end">$2.91</text>
+    <line x1="70" y1="413" x2="532" y2="413" stroke="#334155"/>
+    <text x="70" y="450" fill="#cbd5e1" font-size="18">demo-session-1</text>
+    <text x="424" y="450" fill="#cbd5e1" font-size="18">18 req</text>
+    <text x="512" y="450" fill="#f8fafc" font-size="18" text-anchor="end">$0.73</text>
+    <line x1="70" y1="471" x2="532" y2="471" stroke="#334155"/>
+    <text x="70" y="508" fill="#cbd5e1" font-size="18">docs-cleanup</text>
+    <text x="424" y="508" fill="#cbd5e1" font-size="18">9 req</text>
+    <text x="512" y="508" fill="#f8fafc" font-size="18" text-anchor="end">$0.16</text>
+
+    <rect x="615" y="304" width="543" height="226" rx="18" fill="#1e293b" stroke="#334155"/>
+    <text x="643" y="346" fill="#f8fafc" font-size="24" font-weight="700">Warning flags</text>
+    <rect x="643" y="376" width="154" height="34" rx="17" fill="#7c2d12"/>
+    <text x="720" y="398" fill="#fed7aa" font-size="16" text-anchor="middle">possible_loop</text>
+    <rect x="812" y="376" width="168" height="34" rx="17" fill="#7c2d12"/>
+    <text x="896" y="398" fill="#fed7aa" font-size="16" text-anchor="middle">repeated_prompt</text>
+    <rect x="643" y="430" width="160" height="34" rx="17" fill="#713f12"/>
+    <text x="723" y="452" fill="#fde68a" font-size="16" text-anchor="middle">large_context</text>
+    <rect x="818" y="430" width="178" height="34" rx="17" fill="#713f12"/>
+    <text x="907" y="452" fill="#fde68a" font-size="16" text-anchor="middle">budget_near_limit</text>
+    <rect x="643" y="484" width="164" height="34" rx="17" fill="#581c87"/>
+    <text x="725" y="506" fill="#e9d5ff" font-size="16" text-anchor="middle">test_failure_loop</text>
+
+    <rect x="42" y="560" width="1116" height="132" rx="18" fill="#1e293b" stroke="#334155"/>
+    <text x="70" y="602" fill="#f8fafc" font-size="24" font-weight="700">Blocked requests</text>
+    <text x="70" y="646" fill="#94a3b8" font-size="16">2026-06-03T12:44:10Z</text>
+    <text x="322" y="646" fill="#f97316" font-size="16">runaway-refactor-loop</text>
+    <text x="610" y="646" fill="#fca5a5" font-size="16">daily_budget_exceeded</text>
+    <text x="1004" y="646" fill="#cbd5e1" font-size="16" text-anchor="end">gpt-4.1</text>
+  </g>
+</svg>

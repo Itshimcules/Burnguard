@@ -1,23 +1,33 @@
-# Token Governor
+# Burnguard
 
-**A tiny open-source gateway for metering shared LLM API usage before coding agents turn curiosity into invoices.**
+**Guardrails for shared LLM API usage.**
 
-Token Governor is a small open-source prototype for metering and observing shared LLM API usage.
+Burnguard is a small open-source prototype for metering shared AI API usage before coding agents turn curiosity into invoices.
 
-The goal is not to make AI bureaucracy. The goal is to make runaway token spend visible before it becomes a surprise invoice.
+It sits between AI tools and model providers, issuing local virtual keys, enforcing simple budgets, logging session-level usage, and flagging patterns like repeated prompts, large context, expensive model use, and possible agent loops.
 
-Hopefully this category of tool becomes unnecessary because providers and coding tools make cost controls native. Until then, teams need a way to see who spent what, why it was spent, and when a session should have been stopped.
+Hopefully this category of tool is short-lived.
+
+In a better tooling world, providers and coding agents would make per-user budgets, session-level cost visibility, and runaway-loop protection native. Until then, teams need a practical way to see who spent what, why it was spent, and when a session should have stopped.
+
+> **Design phase / working prototype:** Burnguard is intentionally small and local-first. Treat the current implementation as an MVP for exploration, demos, and feedback rather than production infrastructure.
+
+## Dashboard preview
+
+![Burnguard seeded dashboard preview](docs/dashboard-preview.svg)
+
+Run `python -m token_governor seed-demo` and start the app to populate a dashboard with normal usage, a fake runaway session, warning flags, and blocked requests.
 
 ## Why this exists
 
 Coding agents are useful, but they can burn tokens in loops. Shared API accounts make the problem harder because a single provider key often hides which person, project, tool, or session caused the spend.
 
-Token Governor sits between clients and an OpenAI-compatible provider:
+Burnguard sits between clients and an OpenAI-compatible provider:
 
 ```text
 Client / Script / Coding Agent
         ↓
-Token Governor Gateway
+Burnguard Gateway
         ↓
 Provider API
 ```
@@ -28,7 +38,8 @@ It gives teams a local MVP for visibility, simple budgets, and session-level ins
 
 - Accepts OpenAI-compatible `POST /v1/chat/completions` requests.
 - Validates local virtual API keys such as `tg_sk_demo`.
-- Enforces daily, monthly, and max-single-request budgets.
+- Enforces daily, monthly, and max-single-request budgets before a request is forwarded.
+- Rejects unsupported streaming requests explicitly.
 - Runs in **mock mode** by default so demos do not spend real API money.
 - Can forward to one OpenAI-compatible provider when configured.
 - Logs usage metadata to SQLite: owner, project, key, model, session, tokens, cost, status, route, latency, user-agent, category, and warning flags.
@@ -105,18 +116,20 @@ You can also provide `--key tg_sk_my_key` and `--allowed-models gpt-4o-mini,gpt-
 
 ## Budget behavior
 
-Token Governor uses HTTP **402 Payment Required** when a request is blocked by policy.
+Burnguard uses HTTP **402 Payment Required** when a request is blocked by policy.
 
 Example response:
 
 ```json
 {
   "error": {
-    "message": "Request blocked by Token Governor budget policy.",
+    "message": "Request blocked by Burnguard budget policy.",
     "type": "budget_exceeded",
     "details": {
       "daily_budget_usd": 5.0,
-      "daily_spend_usd": 5.12
+      "daily_spend_usd": 4.99,
+      "projected_daily_spend_usd": 7.99,
+      "estimated_request_cost_usd": 3.0
     }
   }
 }
@@ -128,7 +141,7 @@ Budgets are intentionally simple:
 - `monthly_budget_usd`
 - `max_single_request_usd`
 
-Before forwarding a request, Token Governor estimates input and expected output cost. After a provider response, it records final estimated cost from returned usage when available.
+Before forwarding a request, Burnguard estimates input and expected output cost and blocks requests that would push the key over its daily or monthly budget. After a provider response, it records final estimated cost from returned usage when available.
 
 ## Pricing notes
 
@@ -146,7 +159,7 @@ Included sample entries:
 
 ## Privacy notes
 
-By default, Token Governor does **not** store full prompts or full responses.
+By default, Burnguard does **not** store full prompts or full responses.
 
 It stores:
 

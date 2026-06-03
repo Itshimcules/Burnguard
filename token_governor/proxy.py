@@ -19,7 +19,7 @@ def estimate_message_tokens(messages: list[dict] | None) -> int:
 
 
 def mock_chat_completion(payload: dict, input_tokens: int) -> tuple[dict, int, int]:
-    output_text = "Token Governor mock response: request allowed and metered without calling a paid provider."
+    output_text = "Burnguard mock response: request allowed and metered without calling a paid provider."
     output_tokens = max(12, len(output_text) // 4)
     model = payload.get("model", "mock-cheap")
     response = {

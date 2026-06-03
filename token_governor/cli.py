@@ -73,7 +73,7 @@ def _usage(
         block_reason=block_reason,
         latency_ms=random.randint(120, 1800),
         route_path="/v1/chat/completions",
-        user_agent="token-governor-demo/0.1",
+        user_agent="burnguard-demo/0.1",
         request_category=category,
         warning_flags=flags or [],
         prompt_hash=stable_hash(prompt),
