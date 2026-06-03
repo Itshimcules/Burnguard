@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Overview · Token Governor{% endblock %}
+{% block content %}
+<h1>Overview</h1>
+<section class="cards">
+  <div class="card"><span>Total today</span><strong>${{ "%.4f"|format(total_today) }}</strong></div>
+  <div class="card"><span>Total this month</span><strong>${{ "%.4f"|format(total_month) }}</strong></div>
+  <div class="card"><span>Requests today</span><strong>{{ requests_today }}</strong></div>
+</section>
+<section class="grid">
+  <div class="panel"><h2>Top users</h2><table>{% for row in top_users %}<tr><td>{{ row.owner or "unknown" }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table></div>
+  <div class="panel"><h2>Top projects</h2><table>{% for row in top_projects %}<tr><td>{{ row.project or "unknown" }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table></div>
+  <div class="panel"><h2>Top sessions</h2><table>{% for row in top_sessions %}<tr><td><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a></td><td>{{ row.requests }} req</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table></div>
+  <div class="panel"><h2>Top models</h2><table>{% for row in top_models %}<tr><td>{{ row.model }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table></div>
+  <div class="panel"><h2>Category breakdown</h2><table>{% for row in categories %}<tr><td><span class="pill">{{ row.request_category }}</span></td><td>{{ row.count }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table></div>
+  <div class="panel"><h2>Warning flags</h2>{% for row in recent_flags %}<p><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a> {% for flag in parse_flags(row.warning_flags) %}<span class="flag">{{ flag }}</span>{% endfor %}</p>{% else %}<p>No warning flags yet.</p>{% endfor %}</div>
+</section>
+<section class="panel"><h2>Blocked requests</h2><table><thead><tr><th>Time</th><th>Session</th><th>Reason</th><th>Model</th></tr></thead><tbody>{% for row in blocked %}<tr><td>{{ row.timestamp }}</td><td><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a></td><td>{{ row.block_reason }}</td><td>{{ row.model }}</td></tr>{% endfor %}</tbody></table></section>
+{% endblock %}
