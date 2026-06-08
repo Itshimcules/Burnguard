@@ -6,27 +6,9 @@ Burnguard is a small open-source prototype for metering shared AI API usage befo
 
 It sits between AI tools and model providers, issuing local virtual keys, enforcing simple budgets, logging session-level usage, and flagging patterns like repeated prompts, large context, expensive model use, and possible agent loops.
 
-Hopefully this category of tool is short-lived.
-
 In a better tooling world, providers and coding agents would make per-user budgets, session-level cost visibility, and runaway-loop protection native. Until then, teams need a practical way to see who spent what, why it was spent, and when a session should have stopped.
 
 > **Design phase / working prototype:** Burnguard is intentionally small and local-first. Treat the current implementation as an MVP for exploration, demos, and feedback rather than production infrastructure.
-
-![Burnguard banner](docs/assets/brand/burnguard-banner.svg)
-
-## Visual assets
-
-Burnguard includes repo-ready brand and explainer assets under `docs/assets/brand/`:
-
-- [`burnguard-logo.svg`](docs/assets/brand/burnguard-logo.svg) — full logo and tagline.
-- [`burnguard-mark.svg`](docs/assets/brand/burnguard-mark.svg) — shield/owl mark for favicons, avatars, and small UI treatments.
-- [`burnguard-banner.svg`](docs/assets/brand/burnguard-banner.svg) — wide repository or social header.
-- [`burnguard-social-card.svg`](docs/assets/brand/burnguard-social-card.svg) — Open Graph-style preview card.
-- [`burnguard-app-icon.svg`](docs/assets/brand/burnguard-app-icon.svg) — square app/repo icon.
-- [`burnguard-request-flow.svg`](docs/assets/brand/burnguard-request-flow.svg) — request lifecycle explainer.
-- [`burnguard-architecture.svg`](docs/assets/brand/burnguard-architecture.svg) — high-level architecture diagram.
-
-Run `python -m token_governor seed-demo` and start the app to populate the dashboard with normal usage, a fake runaway session, warning flags, and blocked requests.
 
 ## Why this exists
 
@@ -41,10 +23,6 @@ Burnguard Gateway
         ↓
 Provider API
 ```
-
-![Burnguard architecture](docs/assets/brand/burnguard-architecture.svg)
-
-![Burnguard request flow](docs/assets/brand/burnguard-request-flow.svg)
 
 It gives teams a local MVP for visibility, simple budgets, and session-level inspection without building an enterprise platform.
 
