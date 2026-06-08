@@ -4,6 +4,8 @@ DEFAULT_MODEL_PRICING: dict[str, dict[str, float]] = {
     "gpt-4o-mini": {"input_per_1m": 0.15, "output_per_1m": 0.60},
     "gpt-4.1": {"input_per_1m": 2.00, "output_per_1m": 8.00},
     "claude-sonnet": {"input_per_1m": 3.00, "output_per_1m": 15.00},
+    "claude-3-5-sonnet-latest": {"input_per_1m": 3.00, "output_per_1m": 15.00},
+    "claude-3-7-sonnet-latest": {"input_per_1m": 3.00, "output_per_1m": 15.00},
     "mock-cheap": {"input_per_1m": 0.10, "output_per_1m": 0.20},
 }
 FALLBACK_MODEL_PRICING = {"input_per_1m": 1.00, "output_per_1m": 3.00}
