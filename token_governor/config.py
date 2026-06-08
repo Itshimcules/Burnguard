@@ -30,6 +30,9 @@ class Settings:
     database_url: str = "sqlite:///./token_governor.db"
     openai_compatible_base_url: str = "https://api.openai.com/v1"
     openai_compatible_api_key: str = "replace_me"
+    anthropic_base_url: str = "https://api.anthropic.com/v1"
+    anthropic_api_key: str = "replace_me"
+    anthropic_version: str = "2023-06-01"
     store_raw_messages: bool = False
     default_daily_budget_usd: float = 5.0
     default_monthly_budget_usd: float = 100.0
@@ -59,6 +62,9 @@ def get_settings() -> Settings:
         database_url=os.getenv("DATABASE_URL", "sqlite:///./token_governor.db"),
         openai_compatible_base_url=os.getenv("OPENAI_COMPATIBLE_BASE_URL", "https://api.openai.com/v1"),
         openai_compatible_api_key=os.getenv("OPENAI_COMPATIBLE_API_KEY", "replace_me"),
+        anthropic_base_url=os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1"),
+        anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", "replace_me"),
+        anthropic_version=os.getenv("ANTHROPIC_VERSION", "2023-06-01"),
         store_raw_messages=_bool("STORE_RAW_MESSAGES", False),
         default_daily_budget_usd=float(os.getenv("DEFAULT_DAILY_BUDGET_USD", "5")),
         default_monthly_budget_usd=float(os.getenv("DEFAULT_MONTHLY_BUDGET_USD", "100")),

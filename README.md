@@ -50,12 +50,12 @@ It gives teams a local MVP for visibility, simple budgets, and session-level ins
 
 ## What the MVP does
 
-- Accepts OpenAI-compatible `POST /v1/chat/completions` requests.
+- Accepts OpenAI-compatible `POST /v1/chat/completions` and `POST /v1/responses` requests, plus basic Anthropic-compatible `POST /v1/messages` requests.
 - Validates local virtual API keys such as `tg_sk_demo`.
 - Enforces daily, monthly, and max-single-request budgets before a request is forwarded.
-- Rejects unsupported streaming requests explicitly.
+- Rejects unsupported streaming requests explicitly for Chat Completions, Responses, and Anthropic Messages requests.
 - Runs in **mock mode** by default so demos do not spend real API money.
-- Can forward to one OpenAI-compatible provider when configured.
+- Can forward to one OpenAI-compatible provider and one Anthropic Messages provider when configured.
 - Logs usage metadata to SQLite: owner, project, key, model, session, tokens, cost, status, route, latency, user-agent, category, and warning flags.
 - Tracks sessions using `X-Token-Governor-Session` or generates a session id automatically.
 - Classifies requests with local heuristics only. No extra LLM is used.
@@ -115,6 +115,44 @@ curl http://localhost:8000/v1/chat/completions \
 
 The gateway returns an OpenAI-compatible response and records the request.
 
+## Demo Responses API request
+
+Burnguard also accepts basic non-streaming OpenAI Responses API requests:
+
+```bash
+curl http://localhost:8000/v1/responses \
+  -H "Authorization: Bearer tg_sk_demo" \
+  -H "Content-Type: application/json" \
+  -H "X-Token-Governor-Session: demo-responses-session-1" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "input": "Write a Python function that adds two numbers.",
+    "max_output_tokens": 128
+  }'
+```
+
+The gateway returns an OpenAI Responses-shaped response in mock mode and records the request with the same budget and session controls as Chat Completions. Streaming Responses requests are rejected in this MVP.
+
+## Demo Anthropic Messages request
+
+Burnguard also accepts basic non-streaming Anthropic Messages API requests. The local virtual key can be passed with Anthropic-style `x-api-key` or as an Authorization bearer token:
+
+```bash
+curl http://localhost:8000/v1/messages \
+  -H "x-api-key: tg_sk_demo" \
+  -H "Content-Type: application/json" \
+  -H "X-Token-Governor-Session: demo-anthropic-session-1" \
+  -d '{
+    "model": "claude-sonnet",
+    "max_tokens": 128,
+    "messages": [
+      {"role": "user", "content": "Write a Python function that adds two numbers."}
+    ]
+  }'
+```
+
+In mock mode, the gateway returns an Anthropic Messages-shaped response and records the request with the same budget, privacy, warning flag, and session controls as the OpenAI-compatible routes. Streaming Messages requests are rejected in this MVP.
+
 ## Create a virtual key
 
 ```bash
@@ -126,7 +164,7 @@ python -m token_governor create-key \
   --max-request 1
 ```
 
-You can also provide `--key tg_sk_my_key` and `--allowed-models gpt-4o-mini,gpt-4.1`.
+You can also provide `--key tg_sk_my_key`, `--allowed-models gpt-4o-mini,gpt-4.1,claude-sonnet`, and `--provider anthropic` for keys intended for Anthropic Messages routes.
 
 ## Budget behavior
 
@@ -200,6 +238,9 @@ TOKEN_GOVERNOR_MODE=mock
 DATABASE_URL=sqlite:///./token_governor.db
 OPENAI_COMPATIBLE_BASE_URL=https://api.openai.com/v1
 OPENAI_COMPATIBLE_API_KEY=replace_me
+ANTHROPIC_BASE_URL=https://api.anthropic.com/v1
+ANTHROPIC_API_KEY=replace_me
+ANTHROPIC_VERSION=2023-06-01
 STORE_RAW_MESSAGES=false
 DEFAULT_DAILY_BUDGET_USD=5
 DEFAULT_MONTHLY_BUDGET_USD=100
@@ -209,12 +250,15 @@ LOOP_REQUEST_COUNT=10
 LOOP_WINDOW_MINUTES=15
 ```
 
-To call a real OpenAI-compatible provider, set:
+To call real providers, set the matching upstream credentials for the route you expose:
 
 ```env
 TOKEN_GOVERNOR_MODE=proxy
 OPENAI_COMPATIBLE_BASE_URL=https://api.openai.com/v1
-OPENAI_COMPATIBLE_API_KEY=your_real_provider_key
+OPENAI_COMPATIBLE_API_KEY=your_real_openai_compatible_key
+ANTHROPIC_BASE_URL=https://api.anthropic.com/v1
+ANTHROPIC_API_KEY=your_real_anthropic_key
+ANTHROPIC_VERSION=2023-06-01
 ```
 
 ## Dashboard pages
@@ -235,8 +279,8 @@ uvicorn token_governor.main:app --reload
 
 ## Roadmap
 
-- OpenAI Responses API support
-- Anthropic Messages API support
+- OpenAI Responses API support: basic non-streaming `POST /v1/responses` support is available; richer response item/tool inspection remains future work.
+- Anthropic Messages API support: basic non-streaming `POST /v1/messages` support is available; streaming and richer tool-use attribution remain future work.
 - LiteLLM integration
 - streaming support
 - Slack/Discord alerts
