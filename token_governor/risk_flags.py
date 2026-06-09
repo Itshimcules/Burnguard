@@ -18,6 +18,7 @@ def compute_warning_flags(
     category: str,
     virtual_key: VirtualKey,
     daily_spend_usd: float,
+    context_hash: str | None = None,
     settings: Settings | None = None,
 ) -> list[str]:
     settings = settings or get_settings()
@@ -31,6 +32,13 @@ def compute_warning_flags(
         ).fetchone()["n"]
         if count >= 1:
             flags.append("repeated_prompt")
+    if context_hash:
+        context_count = conn.execute(
+            "SELECT COUNT(*) AS n FROM usage_records WHERE session_id = ? AND context_hash = ?",
+            (session_id, context_hash),
+        ).fetchone()["n"]
+        if context_count >= 2:
+            flags.append("repeated_context")
     window_start = (datetime.now(timezone.utc) - timedelta(minutes=settings.loop_window_minutes)).isoformat()
     recent = conn.execute(
         "SELECT COUNT(*) AS n FROM usage_records WHERE session_id = ? AND timestamp >= ?",

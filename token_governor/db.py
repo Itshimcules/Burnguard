@@ -89,6 +89,11 @@ def init_db(conn: sqlite3.Connection) -> None:
             response_preview TEXT,
             raw_messages TEXT,
             raw_response TEXT,
+            github_repo TEXT,
+            github_pr TEXT,
+            tool_call_count INTEGER NOT NULL DEFAULT 0,
+            tool_names TEXT,
+            context_hash TEXT,
             FOREIGN KEY (virtual_key_id) REFERENCES virtual_keys(id)
         );
         CREATE INDEX IF NOT EXISTS idx_usage_timestamp ON usage_records(timestamp);
@@ -96,6 +101,21 @@ def init_db(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_usage_key_day ON usage_records(virtual_key_id, timestamp);
         """
     )
+    _ensure_usage_columns(conn)
+
+
+def _ensure_usage_columns(conn: sqlite3.Connection) -> None:
+    existing = {row["name"] for row in conn.execute("PRAGMA table_info(usage_records)")}
+    columns = {
+        "github_repo": "TEXT",
+        "github_pr": "TEXT",
+        "tool_call_count": "INTEGER NOT NULL DEFAULT 0",
+        "tool_names": "TEXT",
+        "context_hash": "TEXT",
+    }
+    for name, definition in columns.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE usage_records ADD COLUMN {name} {definition}")
 
 
 def row_to_key(row: sqlite3.Row | None) -> VirtualKey | None:
@@ -163,8 +183,9 @@ def insert_usage(conn: sqlite3.Connection, record: UsageRecord) -> None:
         (request_id, timestamp, virtual_key_id, virtual_key, owner, project, session_id, provider, model,
          estimated_input_tokens, estimated_output_tokens, total_tokens, estimated_cost_usd, status, block_reason,
          latency_ms, route_path, user_agent, request_category, warning_flags, prompt_hash, response_hash,
-         prompt_preview, response_preview, raw_messages, raw_response)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         prompt_preview, response_preview, raw_messages, raw_response, github_repo, github_pr, tool_call_count,
+         tool_names, context_hash)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             record.request_id,
@@ -193,6 +214,11 @@ def insert_usage(conn: sqlite3.Connection, record: UsageRecord) -> None:
             record.response_preview,
             json.dumps(record.raw_messages) if record.raw_messages is not None else None,
             json.dumps(record.raw_response) if record.raw_response is not None else None,
+            record.github_repo,
+            record.github_pr,
+            record.tool_call_count,
+            json.dumps(record.tool_names or []),
+            record.context_hash,
         ),
     )
 

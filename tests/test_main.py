@@ -129,6 +129,91 @@ def test_hermes_style_chat_completion_request_is_metered(monkeypatch, tmp_path):
     assert row["model"] == "gpt-4o-mini"
 
 
+def test_usage_exports_metrics_and_pr_tool_metadata(monkeypatch, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'roadmap.db'}"
+    test_settings = Settings(database_url=database_url)
+    monkeypatch.setattr(main_module, "settings", test_settings)
+    with connect(test_settings) as conn:
+        init_db(conn)
+        create_virtual_key(conn, VirtualKey(None, "tg_sk_roadmap", "Roadmap", "demo", ["gpt-4o-mini"], 5, 100, 1))
+        conn.commit()
+
+    client = TestClient(app)
+    response = client.post(
+        "/v1/chat/completions",
+        headers={
+            "Authorization": "Bearer tg_sk_roadmap",
+            "X-Token-Governor-Session": "pr-session",
+            "X-Token-Governor-GitHub-Repo": "Itshimcules/Burnguard",
+            "X-Token-Governor-GitHub-PR": "8",
+        },
+        json={
+            "model": "gpt-4o-mini",
+            "messages": [
+                {"role": "user", "content": "Review token_governor/main.py and tests/test_main.py."},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "read_file", "arguments": "{}"}}],
+                },
+            ],
+            "tools": [{"type": "function", "function": {"name": "read_file", "parameters": {}}}],
+        },
+    )
+
+    assert response.status_code == 200
+    with connect(test_settings) as conn:
+        row = conn.execute("SELECT github_repo, github_pr, tool_call_count, tool_names, context_hash FROM usage_records").fetchone()
+    assert row["github_repo"] == "Itshimcules/Burnguard"
+    assert row["github_pr"] == "8"
+    assert row["tool_call_count"] == 1
+    assert "read_file" in row["tool_names"]
+    assert row["context_hash"]
+
+    json_export = client.get("/exports/usage.json")
+    assert json_export.status_code == 200
+    assert json_export.json()["records"][0]["github_pr"] == "8"
+
+    csv_export = client.get("/exports/usage.csv")
+    assert csv_export.status_code == 200
+    assert "github_pr" in csv_export.text
+    assert "read_file" in csv_export.text
+
+    report = client.get("/reports/pull-requests")
+    assert report.status_code == 200
+    assert report.json()["pull_requests"][0]["github_repo"] == "Itshimcules/Burnguard"
+
+    metrics = client.get("/metrics")
+    assert metrics.status_code == 200
+    assert "burnguard_requests_allowed_total 1.0" in metrics.text
+
+
+def test_blocked_request_sends_webhook_alert(monkeypatch, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'alerts.db'}"
+    test_settings = Settings(database_url=database_url, slack_webhook_url="https://example.invalid/slack")
+    monkeypatch.setattr(main_module, "settings", test_settings)
+    seen = []
+
+    async def fake_send_alert(record, settings):
+        seen.append((record.status, record.block_reason, settings.slack_webhook_url))
+
+    monkeypatch.setattr(main_module, "send_alert", fake_send_alert)
+    with connect(test_settings) as conn:
+        init_db(conn)
+        create_virtual_key(conn, VirtualKey(None, "tg_sk_alert", "Alert", "demo", ["gpt-4.1"], 5, 100, 0.000001))
+        conn.commit()
+
+    client = TestClient(app)
+    response = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer tg_sk_alert"},
+        json={"model": "gpt-4.1", "messages": [{"role": "user", "content": "Use a large request."}], "max_tokens": 1000},
+    )
+
+    assert response.status_code == 402
+    assert seen == [("blocked", "max_single_request_exceeded", "https://example.invalid/slack")]
+
+
 def test_responses_api_rejects_streaming_requests():
     client = TestClient(app)
 

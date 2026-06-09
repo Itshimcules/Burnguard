@@ -1,0 +1,14 @@
+services:
+  burnguard:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - burnguard-data:/data
+    environment:
+      DATABASE_URL: sqlite:////data/token_governor.db
+
+volumes:
+  burnguard-data:

@@ -52,3 +52,8 @@ class UsageRecord:
     response_preview: str | None
     raw_messages: Any | None = None
     raw_response: Any | None = None
+    github_repo: str | None = None
+    github_pr: str | None = None
+    tool_call_count: int = 0
+    tool_names: list[str] | None = None
+    context_hash: str | None = None
