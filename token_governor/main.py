@@ -402,7 +402,7 @@ def index(request: Request):
         "recent_flags": _rows("SELECT session_id, model, warning_flags, timestamp FROM usage_records WHERE warning_flags != '[]' ORDER BY timestamp DESC LIMIT 10"),
         "parse_flags": _csv_flags,
     }
-    return templates.TemplateResponse("index.html", context)
+    return templates.TemplateResponse(request, "index.html", context)
 
 
 @app.get("/keys")
@@ -411,7 +411,7 @@ def keys(request: Request):
         init_db(conn)
         rows = list_virtual_keys(conn)
         spends = {row["id"]: _scalar("SELECT COALESCE(SUM(estimated_cost_usd),0) FROM usage_records WHERE virtual_key_id=? AND status='allowed'", (row["id"],)) for row in rows}
-    return templates.TemplateResponse("keys.html", {"request": request, "keys": rows, "spends": spends})
+    return templates.TemplateResponse(request, "keys.html", {"request": request, "keys": rows, "spends": spends})
 
 
 @app.get("/sessions")
@@ -423,7 +423,7 @@ def sessions(request: Request):
         FROM usage_records GROUP BY session_id ORDER BY last_seen DESC
         """
     )
-    return templates.TemplateResponse("sessions.html", {"request": request, "sessions": rows})
+    return templates.TemplateResponse(request, "sessions.html", {"request": request, "sessions": rows})
 
 
 @app.get("/sessions/{session_id}")
@@ -444,10 +444,10 @@ def session_detail(request: Request, session_id: str):
         "repeated_prompt_count": sum(1 for count in prompt_counts.values() if count > 1),
         "parse_flags": _csv_flags,
     }
-    return templates.TemplateResponse("session_detail.html", context)
+    return templates.TemplateResponse(request, "session_detail.html", context)
 
 
 @app.get("/requests")
 def requests_page(request: Request):
     rows = _rows("SELECT * FROM usage_records ORDER BY timestamp DESC LIMIT 100")
-    return templates.TemplateResponse("requests.html", {"request": request, "records": rows, "parse_flags": _csv_flags})
+    return templates.TemplateResponse(request, "requests.html", {"request": request, "records": rows, "parse_flags": _csv_flags})
