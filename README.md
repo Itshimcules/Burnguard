@@ -16,6 +16,8 @@ In a better tooling world, providers and coding agents would make per-user budge
 
 ![Burnguard dashboard preview](docs/dashboard-preview.svg)
 
+![Burnguard dashboard demo](docs/assets/demo/burnguard-dashboard-demo.gif)
+
 ## 5-minute demo
 
 Start Burnguard before asking an agent to configure itself. Mock mode is enabled by default, so the demo records usage without calling a paid provider.
@@ -52,57 +54,51 @@ curl http://localhost:8000/v1/chat/completions \
 
 Then check `http://localhost:8000/requests`.
 
-## Use with Hermes Agent
+## Hermes Agent with a spending brake
 
-After Burnguard is running, paste this into Hermes Agent to have it route model calls through the local gateway:
+Hermes Agent can keep its usual workflow while Burnguard sits in front of the model endpoint, meters each request, and shows which run is driving spend. Start Burnguard, then paste this prompt into Hermes Agent:
 
-```text
-Configure Hermes Agent to route OpenAI-compatible model requests through Burnguard.
+```terminal
+$ uvicorn token_governor.main:app --reload
+Burnguard running at http://localhost:8000
 
-Use these Burnguard settings:
+$ paste into Hermes Agent
+Configure Hermes Agent to send OpenAI-compatible model requests through Burnguard.
+
+Use:
 - API base URL: http://localhost:8000/v1
 - API key: tg_sk_demo
 - Default model: gpt-4o-mini
 
-Requirements:
-1. Inspect the existing Hermes model/provider configuration before changing anything.
-2. Use Hermes' custom OpenAI-compatible endpoint/provider option.
-3. Preserve the current model name if one is already configured and it is allowed by the Burnguard virtual key; otherwise use gpt-4o-mini.
-4. Do not put the real upstream OpenAI, Anthropic, OpenRouter, or other provider key into Hermes. Burnguard proxy mode should own real upstream provider keys.
-5. If Hermes supports custom headers in this setup, add X-Token-Governor-Session with a stable value for this project or agent run.
-6. Keep streaming disabled unless Burnguard has explicit streaming support.
-7. After configuration, run one small non-streaming chat request and confirm Burnguard records it on http://localhost:8000/requests.
+Set Hermes to use its custom OpenAI-compatible endpoint or provider option. Keep the current model if it is already allowed by the Burnguard virtual key; otherwise use gpt-4o-mini. Do not store the real upstream provider key in Hermes. If Hermes supports custom headers, add X-Token-Governor-Session with a stable value for this project run. Keep streaming disabled for now.
 
-Report the files or settings changed, the final base URL, the model, whether a session header was configured, and the result of the smoke test.
+After the change, send one small non-streaming chat request, confirm Burnguard records it at http://localhost:8000/requests, and report the final base URL, model, session header status, and smoke-test result.
 ```
 
-For manual Hermes setup details, see [docs/agent-integrations.md](docs/agent-integrations.md#hermes-agent).
+Manual setup details: [Hermes Agent integration](docs/agent-integrations.md#hermes-agent).
 
-## Use with OpenClaw
+## OpenClaw with cost visibility
 
-After Burnguard is running, paste this into OpenClaw to have it route model calls through the local gateway:
+OpenClaw can route through Burnguard the same way it would use any OpenAI-compatible gateway. The result is a local audit trail before long coding sessions become surprise provider bills. Start Burnguard, then paste this prompt into OpenClaw:
 
-```text
-Configure OpenClaw to route OpenAI-compatible model requests through Burnguard.
+```terminal
+$ uvicorn token_governor.main:app --reload
+Burnguard running at http://localhost:8000
 
-Use these Burnguard settings:
+$ paste into OpenClaw
+Configure OpenClaw to send OpenAI-compatible model requests through Burnguard.
+
+Use:
 - API base URL: http://localhost:8000/v1
 - API key: tg_sk_demo
 - Default model: gpt-4o-mini
 
-Requirements:
-1. Inspect the existing OpenClaw model/provider/runtime configuration before changing anything.
-2. Use OpenClaw's custom or OpenAI-compatible API provider path, not a Codex/OAuth subscription runtime path.
-3. Preserve the current model name if one is already configured and it is allowed by the Burnguard virtual key; otherwise use gpt-4o-mini.
-4. Do not put the real upstream OpenAI, Anthropic, OpenRouter, or other provider key into OpenClaw. Burnguard proxy mode should own real upstream provider keys.
-5. If OpenClaw supports custom headers in this setup, add X-Token-Governor-Session with a stable value for this project or agent run.
-6. Keep streaming disabled unless Burnguard has explicit streaming support.
-7. After configuration, run one small non-streaming chat or responses request and confirm Burnguard records it on http://localhost:8000/requests.
+Use OpenClaw's custom or OpenAI-compatible API provider path, not a Codex/OAuth subscription runtime path. Keep the current model if it is already allowed by the Burnguard virtual key; otherwise use gpt-4o-mini. Do not store the real upstream provider key in OpenClaw. If OpenClaw supports custom headers, add X-Token-Governor-Session with a stable value for this project run. Keep streaming disabled for now.
 
-Report the files or settings changed, the final base URL, the model, whether a session header was configured, and the result of the smoke test.
+After the change, send one small non-streaming chat or responses request, confirm Burnguard records it at http://localhost:8000/requests, and report the final base URL, model, session header status, and smoke-test result.
 ```
 
-For manual OpenClaw setup details, see [docs/agent-integrations.md](docs/agent-integrations.md#openclaw).
+Manual setup details: [OpenClaw integration](docs/agent-integrations.md#openclaw).
 
 ## Why this exists
 

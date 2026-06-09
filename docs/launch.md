@@ -18,7 +18,9 @@ sqlite
 llm
 ```
 
-Use `docs/assets/brand/burnguard-social-card.svg` as the source for the GitHub social preview. Export it to PNG if GitHub does not accept the SVG upload.
+Use `docs/assets/brand/burnguard-social-card.png` for the GitHub social preview. The editable SVG source is available at `docs/assets/brand/burnguard-social-card.svg`.
+
+The short dashboard demo GIF lives at `docs/assets/demo/burnguard-dashboard-demo.gif`.
 
 Before launch:
 
