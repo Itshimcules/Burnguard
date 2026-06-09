@@ -11,7 +11,7 @@
   <div class="panel"><h2>Model usage</h2><table>{% for row in model_usage %}<tr><td>{{ row.model }}</td><td>{{ row.count }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table></div>
   <div class="panel"><h2>Categories</h2><table>{% for row in category_breakdown %}<tr><td><span class="pill">{{ row.request_category }}</span></td><td>{{ row.count }}</td></tr>{% endfor %}</table></div>
 </section>
-<section class="panel"><h2>Timeline</h2><table><thead><tr><th>Time</th><th>Status</th><th>Model</th><th>Cost</th><th>Category</th><th>Flags</th><th>Preview</th></tr></thead><tbody>
-{% for row in records %}<tr><td>{{ row.timestamp }}</td><td>{{ row.status }}{% if row.block_reason %}<br><small>{{ row.block_reason }}</small>{% endif %}</td><td>{{ row.model }}</td><td>${{ "%.4f"|format(row.estimated_cost_usd or 0) }}</td><td><span class="pill">{{ row.request_category }}</span></td><td>{% for flag in parse_flags(row.warning_flags) %}<span class="flag">{{ flag }}</span>{% endfor %}</td><td>{{ row.prompt_preview }}</td></tr>{% endfor %}
-</tbody></table></section>
+<section class="panel"><h2>Timeline</h2>{% if records %}<table><thead><tr><th>Time</th><th>Status</th><th>Model</th><th>Cost</th><th>Category</th><th>Flags</th><th>Preview</th></tr></thead><tbody>
+{% for row in records %}<tr><td>{{ format_time(row.timestamp) }}</td><td>{{ row.status }}{% if row.block_reason %}<br><small>{{ row.block_reason }}</small>{% endif %}</td><td>{{ row.model }}</td><td>${{ "%.4f"|format(row.estimated_cost_usd or 0) }}</td><td><span class="pill">{{ row.request_category }}</span></td><td>{% for flag in parse_flags(row.warning_flags) %}<span class="flag">{{ flag }}</span>{% endfor %}</td><td>{{ row.prompt_preview }}</td></tr>{% endfor %}
+</tbody></table>{% else %}<p class="empty">No requests recorded for this session.</p>{% endif %}</section>
 {% endblock %}

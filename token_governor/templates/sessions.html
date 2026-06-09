@@ -2,7 +2,7 @@
 {% block title %}Sessions · Burnguard{% endblock %}
 {% block content %}
 <h1>Sessions</h1>
-<section class="panel"><table><thead><tr><th>Session</th><th>Owner</th><th>Project</th><th>Requests</th><th>Spend</th><th>Blocked</th><th>Last seen</th></tr></thead><tbody>
-{% for row in sessions %}<tr><td><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a></td><td>{{ row.owner }}</td><td>{{ row.project }}</td><td>{{ row.requests }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td><td>{{ row.blocked }}</td><td>{{ row.last_seen }}</td></tr>{% endfor %}
-</tbody></table></section>
+<section class="panel">{% if sessions %}<table><thead><tr><th>Session</th><th>Owner</th><th>Project</th><th>Requests</th><th>Spend</th><th>Blocked</th><th>Last seen</th></tr></thead><tbody>
+{% for row in sessions %}<tr><td><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a></td><td>{{ row.owner }}</td><td>{{ row.project }}</td><td>{{ row.requests }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td><td>{{ row.blocked }}</td><td>{{ format_time(row.last_seen) }}</td></tr>{% endfor %}
+</tbody></table>{% else %}<p class="empty">No sessions yet. Send a request with <code>X-Token-Governor-Session</code> to group agent activity.</p>{% endif %}</section>
 {% endblock %}
