@@ -384,6 +384,25 @@ def _month_start() -> str:
     return datetime(now.year, now.month, 1, tzinfo=timezone.utc).isoformat()
 
 
+def _display_time(value: Any) -> str:
+    if not value:
+        return ""
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return str(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+templates.env.globals["format_time"] = _display_time
+templates.env.globals["gateway_mode"] = lambda: settings.mode
+
+
 @app.get("/")
 def index(request: Request):
     today = _today_start()

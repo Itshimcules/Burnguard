@@ -2,18 +2,32 @@
 {% block title %}Overview · Burnguard{% endblock %}
 {% block content %}
 <h1>Overview</h1>
+<section class="action-strip" aria-label="Next actions">
+  <div>
+    <strong>Start a clean demo</strong>
+    <code>python -m token_governor seed-demo</code>
+  </div>
+  <div>
+    <strong>Create a virtual key</strong>
+    <code>python -m token_governor create-key<br>--owner Team --project demo</code>
+  </div>
+  <div>
+    <strong>Check metered requests</strong>
+    <a class="button-link" href="/requests">Open request log</a>
+  </div>
+</section>
 <section class="cards">
   <div class="card"><span>Total today</span><strong>${{ "%.4f"|format(total_today) }}</strong></div>
   <div class="card"><span>Total this month</span><strong>${{ "%.4f"|format(total_month) }}</strong></div>
   <div class="card"><span>Requests today</span><strong>{{ requests_today }}</strong></div>
 </section>
 <section class="grid">
-  <div class="panel"><h2>Top users</h2><table>{% for row in top_users %}<tr><td>{{ row.owner or "unknown" }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table></div>
-  <div class="panel"><h2>Top projects</h2><table>{% for row in top_projects %}<tr><td>{{ row.project or "unknown" }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table></div>
-  <div class="panel"><h2>Top sessions</h2><table>{% for row in top_sessions %}<tr><td><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a></td><td>{{ row.requests }} req</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table></div>
-  <div class="panel"><h2>Top models</h2><table>{% for row in top_models %}<tr><td>{{ row.model }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table></div>
-  <div class="panel"><h2>Category breakdown</h2><table>{% for row in categories %}<tr><td><span class="pill">{{ row.request_category }}</span></td><td>{{ row.count }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table></div>
-  <div class="panel"><h2>Warning flags</h2>{% for row in recent_flags %}<p><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a> {% for flag in parse_flags(row.warning_flags) %}<span class="flag">{{ flag }}</span>{% endfor %}</p>{% else %}<p>No warning flags yet.</p>{% endfor %}</div>
+  <div class="panel"><h2>Top users</h2>{% if top_users %}<table>{% for row in top_users %}<tr><td>{{ row.owner or "unknown" }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table>{% else %}<p class="empty">No usage recorded yet.</p>{% endif %}</div>
+  <div class="panel"><h2>Top projects</h2>{% if top_projects %}<table>{% for row in top_projects %}<tr><td>{{ row.project or "unknown" }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table>{% else %}<p class="empty">No project usage recorded yet.</p>{% endif %}</div>
+  <div class="panel"><h2>Top sessions</h2>{% if top_sessions %}<table>{% for row in top_sessions %}<tr><td><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a></td><td>{{ row.requests }} req</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table>{% else %}<p class="empty">No sessions yet.</p>{% endif %}</div>
+  <div class="panel"><h2>Top models</h2>{% if top_models %}<table>{% for row in top_models %}<tr><td>{{ row.model }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table>{% else %}<p class="empty">No model usage yet.</p>{% endif %}</div>
+  <div class="panel"><h2>Category breakdown</h2>{% if categories %}<table>{% for row in categories %}<tr><td><span class="pill">{{ row.request_category }}</span></td><td>{{ row.count }}</td><td>${{ "%.4f"|format(row.spend or 0) }}</td></tr>{% endfor %}</table>{% else %}<p class="empty">Requests will be categorized after the first metered call.</p>{% endif %}</div>
+  <div class="panel"><h2>Warning flags</h2>{% for row in recent_flags %}<p class="flag-row"><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a> {% for flag in parse_flags(row.warning_flags) %}<span class="flag">{{ flag }}</span>{% endfor %}</p>{% else %}<p class="empty">No warning flags yet.</p>{% endfor %}</div>
 </section>
-<section class="panel"><h2>Blocked requests</h2><table><thead><tr><th>Time</th><th>Session</th><th>Reason</th><th>Model</th></tr></thead><tbody>{% for row in blocked %}<tr><td>{{ row.timestamp }}</td><td><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a></td><td>{{ row.block_reason }}</td><td>{{ row.model }}</td></tr>{% endfor %}</tbody></table></section>
+<section class="panel"><h2>Blocked requests</h2>{% if blocked %}<table><thead><tr><th>Time</th><th>Session</th><th>Reason</th><th>Model</th></tr></thead><tbody>{% for row in blocked %}<tr><td>{{ format_time(row.timestamp) }}</td><td><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a></td><td>{{ row.block_reason }}</td><td>{{ row.model }}</td></tr>{% endfor %}</tbody></table>{% else %}<p class="empty">No blocked requests.</p>{% endif %}</section>
 {% endblock %}

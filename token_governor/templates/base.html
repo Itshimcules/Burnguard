@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
+    {% set current_path = request.url.path %}
     <header class="topbar">
       <div class="brand">
         <img src="/static/burnguard-mark.svg" alt="" class="brand-mark">
@@ -15,12 +16,15 @@
           <span class="tagline">meter shared LLM API usage before coding agents turn curiosity into invoices</span>
         </div>
       </div>
-      <nav>
-        <a href="/">Overview</a>
-        <a href="/keys">Keys</a>
-        <a href="/sessions">Sessions</a>
-        <a href="/requests">Requests</a>
+      <div class="topbar-actions">
+        <span class="mode-badge" title="Current gateway mode">{{ gateway_mode() }} mode</span>
+        <nav aria-label="Primary">
+          <a href="/" {% if current_path == "/" %}aria-current="page"{% endif %}>Overview</a>
+          <a href="/keys" {% if current_path == "/keys" %}aria-current="page"{% endif %}>Keys</a>
+          <a href="/sessions" {% if current_path.startswith("/sessions") %}aria-current="page"{% endif %}>Sessions</a>
+          <a href="/requests" {% if current_path == "/requests" %}aria-current="page"{% endif %}>Requests</a>
       </nav>
+      </div>
     </header>
     <main>
       {% block content %}{% endblock %}

@@ -18,10 +18,31 @@ def test_dashboard_pages_render(monkeypatch, tmp_path):
 
     client = TestClient(app)
 
-    assert client.get("/").status_code == 200
-    assert client.get("/keys").status_code == 200
-    assert client.get("/sessions").status_code == 200
-    assert client.get("/requests").status_code == 200
+    overview = client.get("/")
+    assert overview.status_code == 200
+    assert "mock mode" in overview.text
+    assert 'aria-current="page">Overview' in overview.text
+    assert "Start a clean demo" in overview.text
+    assert "No usage recorded yet." in overview.text
+
+    keys = client.get("/keys")
+    assert keys.status_code == 200
+    assert 'aria-current="page">Keys' in keys.text
+
+    sessions = client.get("/sessions")
+    assert sessions.status_code == 200
+    assert 'aria-current="page">Sessions' in sessions.text
+    assert "No sessions yet." in sessions.text
+
+    requests = client.get("/requests")
+    assert requests.status_code == 200
+    assert 'aria-current="page">Requests' in requests.text
+    assert "No requests yet." in requests.text
+
+    missing_session = client.get("/sessions/missing")
+    assert missing_session.status_code == 200
+    assert 'aria-current="page">Sessions' in missing_session.text
+    assert "No requests recorded for this session." in missing_session.text
 
 
 def test_chat_completions_rejects_streaming_requests():

@@ -2,7 +2,7 @@
 {% block title %}Requests · Burnguard{% endblock %}
 {% block content %}
 <h1>Recent requests</h1>
-<section class="panel"><table><thead><tr><th>Time</th><th>Owner</th><th>Project</th><th>Session</th><th>Status</th><th>Model</th><th>Tokens</th><th>Cost</th><th>Category</th><th>Flags</th></tr></thead><tbody>
-{% for row in records %}<tr><td>{{ row.timestamp }}</td><td>{{ row.owner }}</td><td>{{ row.project }}</td><td><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a></td><td>{{ row.status }}</td><td>{{ row.model }}</td><td>{{ row.total_tokens }}</td><td>${{ "%.4f"|format(row.estimated_cost_usd or 0) }}</td><td><span class="pill">{{ row.request_category }}</span></td><td>{% for flag in parse_flags(row.warning_flags) %}<span class="flag">{{ flag }}</span>{% endfor %}</td></tr>{% endfor %}
-</tbody></table></section>
+<section class="panel">{% if records %}<table><thead><tr><th>Time</th><th>Owner</th><th>Project</th><th>Session</th><th>Status</th><th>Model</th><th>Tokens</th><th>Cost</th><th>Category</th><th>Flags</th></tr></thead><tbody>
+{% for row in records %}<tr><td>{{ format_time(row.timestamp) }}</td><td>{{ row.owner }}</td><td>{{ row.project }}</td><td><a href="/sessions/{{ row.session_id }}">{{ row.session_id }}</a></td><td>{{ row.status }}</td><td>{{ row.model }}</td><td>{{ row.total_tokens }}</td><td>${{ "%.4f"|format(row.estimated_cost_usd or 0) }}</td><td><span class="pill">{{ row.request_category }}</span></td><td>{% for flag in parse_flags(row.warning_flags) %}<span class="flag">{{ flag }}</span>{% endfor %}</td></tr>{% endfor %}
+</tbody></table>{% else %}<p class="empty">No requests yet. Use the demo curl command in the README to record the first metered request.</p>{% endif %}</section>
 {% endblock %}

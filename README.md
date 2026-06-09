@@ -1,5 +1,9 @@
 # Burnguard
 
+[![tests](https://github.com/Itshimcules/Burnguard/actions/workflows/tests.yml/badge.svg)](https://github.com/Itshimcules/Burnguard/actions/workflows/tests.yml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 **Guardrails for shared LLM API usage.**
 
 Burnguard is a small open-source prototype for metering shared AI API usage before coding agents turn curiosity into invoices.
@@ -12,9 +16,45 @@ In a better tooling world, providers and coding agents would make per-user budge
 
 ![Burnguard dashboard preview](docs/dashboard-preview.svg)
 
+## 5-minute demo
+
+Start Burnguard before asking an agent to configure itself. Mock mode is enabled by default, so the demo records usage without calling a paid provider.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .[dev]
+cp .env.example .env
+python -m token_governor seed-demo
+uvicorn token_governor.main:app --reload
+```
+
+Open the dashboard:
+
+```text
+http://localhost:8000/
+```
+
+Send one metered request:
+
+```bash
+curl http://localhost:8000/v1/chat/completions \
+  -H "Authorization: Bearer tg_sk_demo" \
+  -H "Content-Type: application/json" \
+  -H "X-Token-Governor-Session: demo-session-1" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {"role": "user", "content": "Write a Python function that adds two numbers."}
+    ]
+  }'
+```
+
+Then check `http://localhost:8000/requests`.
+
 ## Use with Hermes Agent
 
-Paste this into Hermes Agent to have it route model calls through Burnguard:
+After Burnguard is running, paste this into Hermes Agent to have it route model calls through the local gateway:
 
 ```text
 Configure Hermes Agent to route OpenAI-compatible model requests through Burnguard.
@@ -40,7 +80,7 @@ For manual Hermes setup details, see [docs/agent-integrations.md](docs/agent-int
 
 ## Use with OpenClaw
 
-Paste this into OpenClaw to have it route model calls through Burnguard:
+After Burnguard is running, paste this into OpenClaw to have it route model calls through the local gateway:
 
 ```text
 Configure OpenClaw to route OpenAI-compatible model requests through Burnguard.

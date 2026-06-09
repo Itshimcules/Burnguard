@@ -2,7 +2,7 @@
 {% block title %}Keys · Burnguard{% endblock %}
 {% block content %}
 <h1>Virtual keys</h1>
-<section class="panel"><table><thead><tr><th>Key</th><th>Owner</th><th>Project</th><th>Models</th><th>Daily</th><th>Monthly</th><th>Max request</th><th>Spend</th><th>Status</th></tr></thead><tbody>
+<section class="panel">{% if keys %}<table><thead><tr><th>Key</th><th>Owner</th><th>Project</th><th>Models</th><th>Daily</th><th>Monthly</th><th>Max request</th><th>Spend</th><th>Status</th></tr></thead><tbody>
 {% for key in keys %}<tr><td><code>{{ key.key }}</code></td><td>{{ key.owner }}</td><td>{{ key.project }}</td><td>{{ key.allowed_models }}</td><td>${{ key.daily_budget_usd }}</td><td>${{ key.monthly_budget_usd }}</td><td>${{ key.max_single_request_usd }}</td><td>${{ "%.4f"|format(spends[key.id]) }}</td><td>{{ "enabled" if key.enabled else "disabled" }}</td></tr>{% endfor %}
-</tbody></table></section>
+</tbody></table>{% else %}<p class="empty">No virtual keys yet. Create one with <code>python -m token_governor create-key --owner Team --project demo</code>.</p>{% endif %}</section>
 {% endblock %}
