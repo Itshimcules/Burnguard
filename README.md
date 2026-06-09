@@ -4,21 +4,50 @@
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**Guardrails for shared LLM API usage.**
+**Meter shared LLM API usage before coding agents turn curiosity into invoices.**
 
-Burnguard is a small open-source prototype for metering shared AI API usage before coding agents turn curiosity into invoices.
+Coding agents are useful until one loops against a shared provider key and the bill only says "API usage." Burnguard gives teams a local gateway that shows which key, project, model, session, and request pattern drove the spend.
 
-It sits between AI tools and model providers, issuing local virtual keys, enforcing simple budgets, logging session-level usage, and flagging patterns like repeated prompts, large context, expensive model use, and possible agent loops.
+Point Hermes Agent, OpenClaw, or any OpenAI-compatible client at Burnguard. It issues virtual keys, checks budgets before forwarding, records request/session cost, and flags risky behavior like repeated prompts, large context, expensive models, and possible agent loops.
 
-In a better tooling world, providers and coding agents would make per-user budgets, session-level cost visibility, and runaway-loop protection native. Until then, teams need a practical way to see who spent what, why it was spent, and when a session should have stopped.
-
-> **Design phase / working prototype:** Burnguard is intentionally small and local-first. Treat the current implementation as an MVP for exploration, demos, and feedback rather than production infrastructure.
+> **Working prototype:** Burnguard is intentionally small and local-first. Treat it as an MVP for exploration, demos, and feedback rather than production infrastructure.
 
 ![Burnguard dashboard preview](docs/dashboard-preview.svg)
 
 ![Burnguard dashboard demo](docs/assets/demo/burnguard-dashboard-demo.gif)
 
-## 5-minute demo
+Local demo data includes 3 virtual keys, 16 metered requests, a runaway session, and a blocked request.
+
+Built with FastAPI, SQLite, Jinja, OpenAI-compatible routing, Anthropic Messages routing, Docker, Prometheus-style metrics, Slack/Discord webhooks, CSV/JSON exports, and a plain local dashboard.
+
+## What is this
+
+Burnguard is a local AI API gateway for teams experimenting with coding agents and shared model accounts. Instead of handing every tool the real provider key, you hand it a Burnguard virtual key:
+
+```text
+Agent / Script / CLI
+        |
+        v
+Burnguard Gateway
+        |
+        v
+OpenAI-compatible or Anthropic-compatible provider
+```
+
+You get a practical control plane before the provider invoice arrives:
+
+| Feature | Why it matters |
+| --- | --- |
+| Virtual API keys | Give each user, project, or agent its own local key. |
+| Budget checks | Block requests that exceed daily, monthly, or max-request limits. |
+| Session tracking | Group spend by agent run with `X-Token-Governor-Session`. |
+| Risk flags | Surface repeated prompts, possible loops, large context, expensive models, high-cost requests, and test failure loops. |
+| Local dashboard | Inspect keys, sessions, requests, model usage, categories, flags, and timelines. |
+| Mock mode | Demo the full flow without spending money on a real provider. |
+| Proxy mode | Forward approved requests to OpenAI-compatible or Anthropic-compatible upstreams. |
+| Exports and metrics | Pull CSV/JSON reports and Prometheus-style metrics for lightweight ops workflows. |
+
+## Quick start
 
 Start Burnguard before asking an agent to configure itself. Mock mode is enabled by default, so the demo records usage without calling a paid provider.
 
@@ -108,9 +137,11 @@ Burnguard sits between clients and an OpenAI-compatible provider:
 
 ```text
 Client / Script / Coding Agent
-        ↓
+        |
+        v
 Burnguard Gateway
-        ↓
+        |
+        v
 Provider API
 ```
 
@@ -147,23 +178,6 @@ This is an MVP/prototype. It does **not** provide:
 - perfect token accounting
 - perfect support for every provider
 - streaming support
-
-## Quick start
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .[dev]
-cp .env.example .env
-python -m token_governor seed-demo
-uvicorn token_governor.main:app --reload
-```
-
-Open the dashboard:
-
-```text
-http://localhost:8000/
-```
 
 ## Demo API request
 
