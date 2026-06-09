@@ -321,6 +321,8 @@ DEFAULT_MAX_SINGLE_REQUEST_USD=1
 LARGE_CONTEXT_TOKEN_THRESHOLD=50000
 LOOP_REQUEST_COUNT=10
 LOOP_WINDOW_MINUTES=15
+SLACK_WEBHOOK_URL=
+DISCORD_WEBHOOK_URL=
 ```
 
 To call real providers, set the matching upstream credentials for the route you expose:
@@ -334,6 +336,27 @@ ANTHROPIC_API_KEY=your_real_anthropic_key
 ANTHROPIC_VERSION=2023-06-01
 ```
 
+For LiteLLM, point Burnguard at the LiteLLM OpenAI-compatible proxy:
+
+```env
+TOKEN_GOVERNOR_MODE=proxy
+OPENAI_COMPATIBLE_BASE_URL=http://localhost:4000/v1
+OPENAI_COMPATIBLE_API_KEY=your_litellm_proxy_key
+```
+
+Optional Slack and Discord webhook URLs send alerts for blocked requests by default. Set `ALERT_ON_WARNING_FLAGS=true` to also alert when Burnguard records warning flags.
+
+## Deployment
+
+Run locally with Docker Compose:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Burnguard listens on `http://localhost:8000/` and stores SQLite data in the `burnguard-data` volume.
+
 ## Dashboard pages
 
 - `/` — overview: spend, requests, top users/projects/sessions/models, categories, flags, blocked requests
@@ -341,6 +364,9 @@ ANTHROPIC_VERSION=2023-06-01
 - `/sessions` — session list with spend totals
 - `/sessions/{session_id}` — session detail, repeated prompts, category breakdown, flags, timeline
 - `/requests` — recent request log
+- `/reports/pull-requests` — JSON spend report grouped by GitHub PR correlation headers
+- `/exports/usage.json` and `/exports/usage.csv` — usage export endpoints
+- `/metrics` — Prometheus-style text metrics
 
 ## Development
 
@@ -352,21 +378,21 @@ uvicorn token_governor.main:app --reload
 
 ## Roadmap
 
-- OpenAI Responses API support: basic non-streaming `POST /v1/responses` support is available; richer response item/tool inspection remains future work.
-- Anthropic Messages API support: basic non-streaming `POST /v1/messages` support is available; streaming and richer tool-use attribution remain future work.
+- OpenAI Responses API support: basic non-streaming `POST /v1/responses` support is available, with tool metadata extraction for metering.
+- Anthropic Messages API support: basic non-streaming `POST /v1/messages` support is available, with tool-use metadata extraction for metering.
 - Hermes Agent and OpenClaw gateway setup: documented for OpenAI-compatible routing.
-- LiteLLM integration
+- LiteLLM integration: supported through the OpenAI-compatible proxy base URL.
 - streaming support
-- Slack/Discord alerts
-- GitHub PR/session correlation
-- MCP/tool-call cost attribution
-- repeated file/context detection
-- cost-per-merged-PR reports
+- Slack/Discord alerts: webhook alerts are available for blocked requests and optional warning flags.
+- GitHub PR/session correlation: use `X-Token-Governor-GitHub-Repo` and `X-Token-Governor-GitHub-PR` request headers.
+- MCP/tool-call cost attribution: tool names and tool-call counts are recorded when present in request or response payloads.
+- repeated file/context detection: repeated file-context fingerprints can raise `repeated_context`.
+- cost-per-merged-PR reports: `/reports/pull-requests` groups spend by PR correlation headers.
 - per-team approval workflows
-- Docker Compose deployment
+- Docker Compose deployment: `docker compose up --build` is available.
 - hosted dashboard mode
-- export to CSV/JSON
-- Prometheus/OpenTelemetry support
+- export to CSV/JSON: `/exports/usage.csv` and `/exports/usage.json` are available.
+- Prometheus/OpenTelemetry support: `/metrics` exposes basic Prometheus-style metrics; OpenTelemetry remains future work.
 
 ## License
 

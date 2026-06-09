@@ -3,16 +3,20 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from csv import DictWriter
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from io import StringIO
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from .alerts import send_alert
+from .attribution import count_tool_calls, extract_tool_names, file_context_hash
 from .auth import AuthError, validate_virtual_key
 from .budget import check_budget
 from .classifier import classify_request
@@ -51,6 +55,10 @@ class MeteredRequestSpec:
     input_tokens: int
     estimated_output_tokens: int
     forwarder: Forwarder
+    github_repo: str | None = None
+    github_pr: str | None = None
+    tool_names: list[str] | None = None
+    context_hash: str | None = None
 
 
 @app.on_event("startup")
@@ -108,6 +116,11 @@ def _usage_record(
     response_preview: str | None,
     raw_messages: Any | None = None,
     raw_response: Any | None = None,
+    github_repo: str | None = None,
+    github_pr: str | None = None,
+    tool_call_count: int = 0,
+    tool_names: list[str] | None = None,
+    context_hash: str | None = None,
 ) -> UsageRecord:
     return UsageRecord(
         request_id=request_id,
@@ -136,6 +149,11 @@ def _usage_record(
         response_preview=response_preview,
         raw_messages=raw_messages,
         raw_response=raw_response,
+        github_repo=github_repo,
+        github_pr=github_pr,
+        tool_call_count=tool_call_count,
+        tool_names=tool_names,
+        context_hash=context_hash,
     )
 
 
@@ -173,9 +191,14 @@ async def _handle_metered_request(spec: MeteredRequestSpec, authorization: str |
                 prompt_preview=prompt_preview,
                 response_preview=None,
                 raw_messages=raw_prompt,
+                github_repo=spec.github_repo,
+                github_pr=spec.github_pr,
+                tool_names=spec.tool_names,
+                context_hash=spec.context_hash,
             )
             insert_usage(conn, record)
             conn.commit()
+            await send_alert(record, settings)
             raise HTTPException(status_code=401, detail=str(exc)) from exc
 
         decision = check_budget(conn, virtual_key, spec.model, spec.input_tokens, spec.estimated_output_tokens)
@@ -189,6 +212,7 @@ async def _handle_metered_request(spec: MeteredRequestSpec, authorization: str |
             category=category,
             virtual_key=virtual_key,
             daily_spend_usd=decision.daily_spend,
+            context_hash=spec.context_hash,
             settings=settings,
         )
         if not decision.allowed:
@@ -213,9 +237,14 @@ async def _handle_metered_request(spec: MeteredRequestSpec, authorization: str |
                 prompt_preview=prompt_preview,
                 response_preview=None,
                 raw_messages=raw_prompt,
+                github_repo=spec.github_repo,
+                github_pr=spec.github_pr,
+                tool_names=spec.tool_names,
+                context_hash=spec.context_hash,
             )
             insert_usage(conn, record)
             conn.commit()
+            await send_alert(record, settings)
             return JSONResponse(
                 status_code=402,
                 content={
@@ -239,6 +268,8 @@ async def _handle_metered_request(spec: MeteredRequestSpec, authorization: str |
         block_reason = "provider_error"
 
     response_text = _response_text(provider_response)
+    tool_names = sorted(set((spec.tool_names or []) + extract_tool_names(provider_response)))
+    tool_call_count = count_tool_calls(spec.payload, provider_response)
     cost = estimate_cost(spec.model, actual_input, actual_output)
     with connect(settings) as conn:
         init_db(conn)
@@ -265,10 +296,22 @@ async def _handle_metered_request(spec: MeteredRequestSpec, authorization: str |
             response_preview=safe_preview(response_text),
             raw_messages=raw_prompt,
             raw_response=provider_response if settings.store_raw_messages else None,
+            github_repo=spec.github_repo,
+            github_pr=spec.github_pr,
+            tool_call_count=tool_call_count,
+            tool_names=tool_names,
+            context_hash=spec.context_hash,
         )
         insert_usage(conn, record)
         conn.commit()
+    await send_alert(record, settings)
     return JSONResponse(status_code=200 if status == "allowed" else 502, content=provider_response)
+
+
+def _correlation(repo_header: str | None, pr_header: str | None) -> tuple[str | None, str | None]:
+    repo = repo_header.strip() if repo_header else None
+    pr = pr_header.strip() if pr_header else None
+    return repo or None, pr or None
 
 
 @app.post("/v1/chat/completions")
@@ -276,6 +319,8 @@ async def chat_completions(
     request: Request,
     authorization: str | None = Header(default=None, alias="Authorization"),
     session_header: str | None = Header(default=None, alias="X-Token-Governor-Session"),
+    github_repo: str | None = Header(default=None, alias="X-Token-Governor-GitHub-Repo"),
+    github_pr: str | None = Header(default=None, alias="X-Token-Governor-GitHub-PR"),
     user_agent: str | None = Header(default=None, alias="User-Agent"),
 ) -> JSONResponse:
     payload = await request.json()
@@ -283,6 +328,7 @@ async def chat_completions(
         return _unsupported_streaming_response()
 
     messages = payload.get("messages", [])
+    repo, pr = _correlation(github_repo, github_pr)
     spec = MeteredRequestSpec(
         payload=payload,
         route_path=str(request.url.path),
@@ -293,6 +339,10 @@ async def chat_completions(
         input_tokens=estimate_message_tokens(messages),
         estimated_output_tokens=int(payload.get("max_tokens") or 512),
         forwarder=forward_chat_completion,
+        github_repo=repo,
+        github_pr=pr,
+        tool_names=extract_tool_names(payload),
+        context_hash=file_context_hash(messages),
     )
     return await _handle_metered_request(spec, authorization, user_agent)
 
@@ -302,6 +352,8 @@ async def responses(
     request: Request,
     authorization: str | None = Header(default=None, alias="Authorization"),
     session_header: str | None = Header(default=None, alias="X-Token-Governor-Session"),
+    github_repo: str | None = Header(default=None, alias="X-Token-Governor-GitHub-Repo"),
+    github_pr: str | None = Header(default=None, alias="X-Token-Governor-GitHub-PR"),
     user_agent: str | None = Header(default=None, alias="User-Agent"),
 ) -> JSONResponse:
     payload = await request.json()
@@ -309,6 +361,7 @@ async def responses(
         return _unsupported_streaming_response()
 
     prompt_material = {"instructions": payload.get("instructions"), "input": payload.get("input")}
+    repo, pr = _correlation(github_repo, github_pr)
     spec = MeteredRequestSpec(
         payload=payload,
         route_path=str(request.url.path),
@@ -319,6 +372,10 @@ async def responses(
         input_tokens=estimate_response_input_tokens(payload),
         estimated_output_tokens=int(payload.get("max_output_tokens") or 512),
         forwarder=forward_response,
+        github_repo=repo,
+        github_pr=pr,
+        tool_names=extract_tool_names(payload),
+        context_hash=file_context_hash(prompt_material),
     )
     return await _handle_metered_request(spec, authorization, user_agent)
 
@@ -329,6 +386,8 @@ async def anthropic_messages(
     authorization: str | None = Header(default=None, alias="Authorization"),
     x_api_key: str | None = Header(default=None, alias="X-Api-Key"),
     session_header: str | None = Header(default=None, alias="X-Token-Governor-Session"),
+    github_repo: str | None = Header(default=None, alias="X-Token-Governor-GitHub-Repo"),
+    github_pr: str | None = Header(default=None, alias="X-Token-Governor-GitHub-PR"),
     user_agent: str | None = Header(default=None, alias="User-Agent"),
 ) -> JSONResponse:
     payload = await request.json()
@@ -337,6 +396,7 @@ async def anthropic_messages(
 
     prompt_material = {"system": payload.get("system"), "messages": payload.get("messages", [])}
     bearer = authorization or (f"Bearer {x_api_key}" if x_api_key else None)
+    repo, pr = _correlation(github_repo, github_pr)
     spec = MeteredRequestSpec(
         payload=payload,
         route_path=str(request.url.path),
@@ -347,6 +407,10 @@ async def anthropic_messages(
         input_tokens=estimate_anthropic_input_tokens(payload),
         estimated_output_tokens=int(payload.get("max_tokens") or 512),
         forwarder=forward_anthropic_message,
+        github_repo=repo,
+        github_pr=pr,
+        tool_names=extract_tool_names(payload),
+        context_hash=file_context_hash(prompt_material),
     )
     return await _handle_metered_request(spec, bearer, user_agent)
 
@@ -372,6 +436,40 @@ def _scalar(sql: str, params: tuple = ()) -> float:
     if not rows:
         return 0.0
     return float(rows[0][0] or 0)
+
+
+def _record_dict(row: Any) -> dict[str, Any]:
+    return {
+        "request_id": row["request_id"],
+        "timestamp": row["timestamp"],
+        "owner": row["owner"],
+        "project": row["project"],
+        "session_id": row["session_id"],
+        "provider": row["provider"],
+        "model": row["model"],
+        "status": row["status"],
+        "block_reason": row["block_reason"],
+        "route_path": row["route_path"],
+        "estimated_input_tokens": row["estimated_input_tokens"],
+        "estimated_output_tokens": row["estimated_output_tokens"],
+        "total_tokens": row["total_tokens"],
+        "estimated_cost_usd": row["estimated_cost_usd"],
+        "request_category": row["request_category"],
+        "warning_flags": _csv_flags(row["warning_flags"]),
+        "github_repo": row["github_repo"],
+        "github_pr": row["github_pr"],
+        "tool_call_count": row["tool_call_count"],
+        "tool_names": _csv_flags(row["tool_names"]),
+    }
+
+
+def _usage_export_rows(limit: int = 1000) -> list[Any]:
+    bounded = max(1, min(limit, 10_000))
+    return _rows("SELECT * FROM usage_records ORDER BY timestamp DESC LIMIT ?", (bounded,))
+
+
+def _prom_metric(name: str, value: float, help_text: str, metric_type: str = "gauge") -> str:
+    return f"# HELP {name} {help_text}\n# TYPE {name} {metric_type}\n{name} {value}\n"
 
 
 def _today_start() -> str:
@@ -470,3 +568,91 @@ def session_detail(request: Request, session_id: str):
 def requests_page(request: Request):
     rows = _rows("SELECT * FROM usage_records ORDER BY timestamp DESC LIMIT 100")
     return templates.TemplateResponse(request, "requests.html", {"request": request, "records": rows, "parse_flags": _csv_flags})
+
+
+@app.get("/exports/usage.json")
+def export_usage_json(limit: int = 1000) -> JSONResponse:
+    return JSONResponse({"records": [_record_dict(row) for row in _usage_export_rows(limit)]})
+
+
+@app.get("/exports/usage.csv")
+def export_usage_csv(limit: int = 1000) -> StreamingResponse:
+    rows = [_record_dict(row) for row in _usage_export_rows(limit)]
+    output = StringIO()
+    fieldnames = [
+        "request_id",
+        "timestamp",
+        "owner",
+        "project",
+        "session_id",
+        "provider",
+        "model",
+        "status",
+        "block_reason",
+        "route_path",
+        "estimated_input_tokens",
+        "estimated_output_tokens",
+        "total_tokens",
+        "estimated_cost_usd",
+        "request_category",
+        "warning_flags",
+        "github_repo",
+        "github_pr",
+        "tool_call_count",
+        "tool_names",
+    ]
+    writer = DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({**row, "warning_flags": ",".join(row["warning_flags"]), "tool_names": ",".join(row["tool_names"])})
+    output.seek(0)
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=burnguard-usage.csv"})
+
+
+@app.get("/reports/pull-requests")
+def pull_request_report() -> JSONResponse:
+    rows = _rows(
+        """
+        SELECT github_repo, github_pr, COUNT(*) requests, SUM(estimated_cost_usd) spend,
+               SUM(CASE WHEN status='blocked' THEN 1 ELSE 0 END) blocked,
+               MAX(timestamp) last_seen
+        FROM usage_records
+        WHERE github_pr IS NOT NULL AND github_pr != ''
+        GROUP BY github_repo, github_pr
+        ORDER BY spend DESC
+        """
+    )
+    return JSONResponse(
+        {
+            "pull_requests": [
+                {
+                    "github_repo": row["github_repo"],
+                    "github_pr": row["github_pr"],
+                    "requests": row["requests"],
+                    "spend": round(float(row["spend"] or 0), 6),
+                    "blocked": row["blocked"],
+                    "last_seen": row["last_seen"],
+                }
+                for row in rows
+            ]
+        }
+    )
+
+
+@app.get("/metrics")
+def metrics() -> PlainTextResponse:
+    allowed = _scalar("SELECT COUNT(*) FROM usage_records WHERE status='allowed'")
+    blocked = _scalar("SELECT COUNT(*) FROM usage_records WHERE status='blocked'")
+    errored = _scalar("SELECT COUNT(*) FROM usage_records WHERE status='errored'")
+    spend = _scalar("SELECT COALESCE(SUM(estimated_cost_usd),0) FROM usage_records WHERE status='allowed'")
+    tokens = _scalar("SELECT COALESCE(SUM(total_tokens),0) FROM usage_records")
+    content = "".join(
+        [
+            _prom_metric("burnguard_requests_allowed_total", allowed, "Allowed Burnguard requests.", "counter"),
+            _prom_metric("burnguard_requests_blocked_total", blocked, "Blocked Burnguard requests.", "counter"),
+            _prom_metric("burnguard_requests_errored_total", errored, "Errored Burnguard requests.", "counter"),
+            _prom_metric("burnguard_estimated_spend_usd_total", spend, "Estimated allowed request spend in USD.", "counter"),
+            _prom_metric("burnguard_tokens_total", tokens, "Estimated total tokens processed by Burnguard.", "counter"),
+        ]
+    )
+    return PlainTextResponse(content, media_type="text/plain; version=0.0.4")

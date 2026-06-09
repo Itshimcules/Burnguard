@@ -42,6 +42,10 @@ class Settings:
     loop_window_minutes: int = 15
     high_cost_single_request_warning_usd: float = 0.50
     expensive_models: tuple[str, ...] = ("gpt-4.1", "claude-sonnet")
+    slack_webhook_url: str = ""
+    discord_webhook_url: str = ""
+    alert_on_blocked: bool = True
+    alert_on_warning_flags: bool = False
 
     @property
     def sqlite_path(self) -> str:
@@ -74,4 +78,8 @@ def get_settings() -> Settings:
         loop_window_minutes=int(os.getenv("LOOP_WINDOW_MINUTES", "15")),
         high_cost_single_request_warning_usd=float(os.getenv("HIGH_COST_SINGLE_REQUEST_WARNING_USD", "0.50")),
         expensive_models=expensive,
+        slack_webhook_url=os.getenv("SLACK_WEBHOOK_URL", ""),
+        discord_webhook_url=os.getenv("DISCORD_WEBHOOK_URL", ""),
+        alert_on_blocked=_bool("ALERT_ON_BLOCKED", True),
+        alert_on_warning_flags=_bool("ALERT_ON_WARNING_FLAGS", False),
     )

@@ -36,3 +36,27 @@ def test_possible_loop_flag_works(conn):
     settings = Settings(loop_request_count=3, loop_window_minutes=15)
     flags = compute_warning_flags(conn, session_id="loop", prompt_hash="new", model="gpt-4o-mini", input_tokens=10, estimated_cost_usd=0.01, category="general_chat", virtual_key=key, daily_spend_usd=0, settings=settings)
     assert "possible_loop" in flags
+
+
+def test_repeated_context_flag_works(conn):
+    init_db(conn)
+    key = _key(conn)
+    for idx in range(2):
+        record = _record(key, f"req_context_{idx}", prompt_hash=f"context-{idx}")
+        record.context_hash = "same-files"
+        insert_usage(conn, record)
+
+    flags = compute_warning_flags(
+        conn,
+        session_id="loop",
+        prompt_hash="new",
+        model="gpt-4o-mini",
+        input_tokens=10,
+        estimated_cost_usd=0.01,
+        category="general_chat",
+        virtual_key=key,
+        daily_spend_usd=0,
+        context_hash="same-files",
+    )
+
+    assert "repeated_context" in flags
