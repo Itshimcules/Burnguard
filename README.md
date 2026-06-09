@@ -10,6 +10,60 @@ In a better tooling world, providers and coding agents would make per-user budge
 
 > **Design phase / working prototype:** Burnguard is intentionally small and local-first. Treat the current implementation as an MVP for exploration, demos, and feedback rather than production infrastructure.
 
+![Burnguard dashboard preview](docs/dashboard-preview.svg)
+
+## Use with Hermes Agent
+
+Paste this into Hermes Agent to have it route model calls through Burnguard:
+
+```text
+Configure Hermes Agent to route OpenAI-compatible model requests through Burnguard.
+
+Use these Burnguard settings:
+- API base URL: http://localhost:8000/v1
+- API key: tg_sk_demo
+- Default model: gpt-4o-mini
+
+Requirements:
+1. Inspect the existing Hermes model/provider configuration before changing anything.
+2. Use Hermes' custom OpenAI-compatible endpoint/provider option.
+3. Preserve the current model name if one is already configured and it is allowed by the Burnguard virtual key; otherwise use gpt-4o-mini.
+4. Do not put the real upstream OpenAI, Anthropic, OpenRouter, or other provider key into Hermes. Burnguard proxy mode should own real upstream provider keys.
+5. If Hermes supports custom headers in this setup, add X-Token-Governor-Session with a stable value for this project or agent run.
+6. Keep streaming disabled unless Burnguard has explicit streaming support.
+7. After configuration, run one small non-streaming chat request and confirm Burnguard records it on http://localhost:8000/requests.
+
+Report the files or settings changed, the final base URL, the model, whether a session header was configured, and the result of the smoke test.
+```
+
+For manual Hermes setup details, see [docs/agent-integrations.md](docs/agent-integrations.md#hermes-agent).
+
+## Use with OpenClaw
+
+Paste this into OpenClaw to have it route model calls through Burnguard:
+
+```text
+Configure OpenClaw to route OpenAI-compatible model requests through Burnguard.
+
+Use these Burnguard settings:
+- API base URL: http://localhost:8000/v1
+- API key: tg_sk_demo
+- Default model: gpt-4o-mini
+
+Requirements:
+1. Inspect the existing OpenClaw model/provider/runtime configuration before changing anything.
+2. Use OpenClaw's custom or OpenAI-compatible API provider path, not a Codex/OAuth subscription runtime path.
+3. Preserve the current model name if one is already configured and it is allowed by the Burnguard virtual key; otherwise use gpt-4o-mini.
+4. Do not put the real upstream OpenAI, Anthropic, OpenRouter, or other provider key into OpenClaw. Burnguard proxy mode should own real upstream provider keys.
+5. If OpenClaw supports custom headers in this setup, add X-Token-Governor-Session with a stable value for this project or agent run.
+6. Keep streaming disabled unless Burnguard has explicit streaming support.
+7. After configuration, run one small non-streaming chat or responses request and confirm Burnguard records it on http://localhost:8000/requests.
+
+Report the files or settings changed, the final base URL, the model, whether a session header was configured, and the result of the smoke test.
+```
+
+For manual OpenClaw setup details, see [docs/agent-integrations.md](docs/agent-integrations.md#openclaw).
+
 ## Why this exists
 
 Coding agents are useful, but they can burn tokens in loops. Shared API accounts make the problem harder because a single provider key often hides which person, project, tool, or session caused the spend.
@@ -40,6 +94,7 @@ It gives teams a local MVP for visibility, simple budgets, and session-level ins
 - Detects basic risk flags: repeated prompts, possible loops, large context, expensive models, budget-near-limit, high-cost requests, and test failure loops.
 - Shows a plain FastAPI/Jinja dashboard at `/`, `/keys`, `/sessions`, `/sessions/{session_id}`, and `/requests`.
 - Provides `python -m token_governor seed-demo` for fake data that makes the dashboard useful immediately.
+- Includes setup guidance for routing Hermes Agent, OpenClaw, and other OpenAI-compatible agents through Burnguard.
 
 ## What it does not do
 
@@ -259,6 +314,7 @@ uvicorn token_governor.main:app --reload
 
 - OpenAI Responses API support: basic non-streaming `POST /v1/responses` support is available; richer response item/tool inspection remains future work.
 - Anthropic Messages API support: basic non-streaming `POST /v1/messages` support is available; streaming and richer tool-use attribution remain future work.
+- Hermes Agent and OpenClaw gateway setup: documented for OpenAI-compatible routing.
 - LiteLLM integration
 - streaming support
 - Slack/Discord alerts
