@@ -13,3 +13,10 @@ def test_safe_preview_redacts_common_secrets_and_caps_length() -> None:
     assert "dev@example.com" not in preview
     assert "[REDACTED" in preview
     assert len(preview) == 200
+
+
+def test_safe_preview_redacts_burnguard_virtual_keys() -> None:
+    preview = safe_preview("use tg_sk_demo and tg_sk_codex_project_a please")
+    assert "tg_sk_demo" not in preview
+    assert "tg_sk_codex_project_a" not in preview
+    assert "[REDACTED_KEY]" in preview

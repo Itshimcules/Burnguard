@@ -86,7 +86,7 @@ def _usage(
 def seed_demo(_: argparse.Namespace) -> None:
     settings = get_settings()
     keys = [
-        VirtualKey(None, "tg_sk_demo", "Stephan", "demo", ["gpt-4o-mini", "gpt-4.1", "claude-sonnet"], 5, 100, 1),
+        VirtualKey(None, "tg_sk_demo", "Alex", "demo", ["gpt-4o-mini", "gpt-4.1", "claude-sonnet"], 5, 100, 1),
         VirtualKey(None, "tg_sk_codex_project_a", "Codex Agent", "project-a", ["gpt-4o-mini", "gpt-4.1"], 3, 50, 0.75),
         VirtualKey(None, "tg_sk_marketing_test", "Marketing", "content-test", ["gpt-4o-mini"], 2, 25, 0.25),
     ]

@@ -60,3 +60,12 @@ def test_repeated_context_flag_works(conn):
     )
 
     assert "repeated_context" in flags
+
+
+def test_unknown_model_pricing_flag_works(conn):
+    init_db(conn)
+    key = _key(conn)
+    flags = compute_warning_flags(conn, session_id="loop", prompt_hash="abc", model="some-future-model", input_tokens=10, estimated_cost_usd=0.01, category="general_chat", virtual_key=key, daily_spend_usd=0)
+    assert "unknown_model_pricing" in flags
+    flags = compute_warning_flags(conn, session_id="loop", prompt_hash="abc", model="gpt-4o-mini", input_tokens=10, estimated_cost_usd=0.01, category="general_chat", virtual_key=key, daily_spend_usd=0)
+    assert "unknown_model_pricing" not in flags

@@ -9,7 +9,7 @@ MAX_PREVIEW_CHARS = 200
 
 _SECRET_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"(?i)\b(bearer|api[_-]?key|authorization|password|secret|token)\s*[:=]\s*['\"]?[^\s,'\"}]+"), r"\1=[REDACTED]"),
-    (re.compile(r"\b(?:sk|tg_sk|ant|or)-[A-Za-z0-9_\-]{8,}\b"), "[REDACTED_KEY]"),
+    (re.compile(r"\btg_sk_[A-Za-z0-9_\-]+\b|\b(?:sk|ant|or)-[A-Za-z0-9_\-]{8,}\b"), "[REDACTED_KEY]"),
     (re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "[REDACTED_EMAIL]"),
 )
 
