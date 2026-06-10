@@ -10,6 +10,10 @@ class AuthError(ValueError):
     pass
 
 
+class ModelNotAllowedError(AuthError):
+    pass
+
+
 def extract_bearer_token(authorization: str | None) -> str:
     if not authorization:
         raise AuthError("Missing Authorization bearer token")
@@ -27,5 +31,5 @@ def validate_virtual_key(conn: sqlite3.Connection, authorization: str | None, mo
     if not virtual_key.enabled:
         raise AuthError("Virtual API key is disabled")
     if model and virtual_key.allowed_models and model not in virtual_key.allowed_models:
-        raise AuthError(f"Model '{model}' is not allowed for this virtual key")
+        raise ModelNotAllowedError(f"Model '{model}' is not allowed for this virtual key")
     return virtual_key

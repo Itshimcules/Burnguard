@@ -17,7 +17,7 @@ Important limitations:
 - By default, Burnguard stores prompt and response hashes plus short redacted previews. It does not store full raw prompts or responses unless `STORE_RAW_MESSAGES=true` is set.
 - Redaction is best-effort and heuristic-based. Treat previews and exports as operational metadata that may still contain sensitive context.
 - The dashboard does not provide multi-user login, enterprise RBAC, tenant isolation, or production-grade access control.
-- Budget checks are guardrails, not financial guarantees. Token accounting and pricing defaults must be verified before real billing decisions.
+- Budget checks are guardrails, not financial guarantees. Token accounting and pricing defaults must be verified before real billing decisions. Budget checks are also not race-safe: concurrent requests can each pass the check before any of them is recorded, so a parallel burst can overshoot a budget.
 - Streaming is not supported in this MVP.
 
 ## Handling provider keys

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from .config import Settings, get_settings
 from .models import VirtualKey
+from .pricing import has_model_pricing
 
 
 def compute_warning_flags(
@@ -23,6 +24,8 @@ def compute_warning_flags(
 ) -> list[str]:
     settings = settings or get_settings()
     flags: list[str] = []
+    if not has_model_pricing(model):
+        flags.append("unknown_model_pricing")
     if input_tokens >= settings.large_context_token_threshold:
         flags.append("large_context")
     if prompt_hash:

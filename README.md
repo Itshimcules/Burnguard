@@ -24,15 +24,7 @@ Built with FastAPI, SQLite, Jinja, OpenAI-compatible routing, Anthropic Messages
 
 Burnguard is a local AI API gateway for teams experimenting with coding agents and shared model accounts. Instead of handing every tool the real provider key, you hand it a Burnguard virtual key:
 
-```text
-Agent / Script / CLI
-        |
-        v
-Burnguard Gateway
-        |
-        v
-OpenAI-compatible or Anthropic-compatible provider
-```
+![Burnguard architecture: AI tools send requests through Burnguard to model providers](docs/assets/brand/burnguard-architecture.svg)
 
 You get a practical control plane before the provider invoice arrives:
 
@@ -54,7 +46,7 @@ Start Burnguard before asking an agent to configure itself. Mock mode is enabled
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .[dev]
+pip install -e ".[dev]"
 cp .env.example .env
 python -m token_governor seed-demo
 uvicorn token_governor.main:app --reload
@@ -240,7 +232,7 @@ In mock mode, the gateway returns an Anthropic Messages-shaped response and reco
 
 ```bash
 python -m token_governor create-key \
-  --owner "Stephan" \
+  --owner "alex" \
   --project "demo" \
   --daily-budget 5 \
   --monthly-budget 100 \
@@ -371,6 +363,8 @@ Burnguard listens on `http://localhost:8000/` and stores SQLite data in the `bur
 
 ## Dashboard pages
 
+![Burnguard dashboard demo](docs/assets/demo/burnguard-dashboard-demo.gif)
+
 - `/` — overview: spend, requests, top users/projects/sessions/models, categories, flags, blocked requests
 - `/keys` — virtual keys and budgets
 - `/sessions` — session list with spend totals
@@ -390,21 +384,27 @@ uvicorn token_governor.main:app --reload
 
 ## Roadmap
 
-- OpenAI Responses API support: basic non-streaming `POST /v1/responses` support is available, with tool metadata extraction for metering.
-- Anthropic Messages API support: basic non-streaming `POST /v1/messages` support is available, with tool-use metadata extraction for metering.
-- Hermes Agent and OpenClaw gateway setup: documented for OpenAI-compatible routing.
-- LiteLLM integration: supported through the OpenAI-compatible proxy base URL.
-- streaming support
-- Slack/Discord alerts: webhook alerts are available for blocked requests and optional warning flags.
-- GitHub PR/session correlation: use `X-Token-Governor-GitHub-Repo` and `X-Token-Governor-GitHub-PR` request headers.
+Shipped:
+
+- OpenAI Responses API: basic non-streaming `POST /v1/responses` with tool metadata extraction for metering.
+- Anthropic Messages API: basic non-streaming `POST /v1/messages` with tool-use metadata extraction for metering.
+- Hermes Agent and OpenClaw gateway setup, documented for OpenAI-compatible routing.
+- LiteLLM integration through the OpenAI-compatible proxy base URL.
+- Slack/Discord webhook alerts for blocked requests and optional warning flags.
+- GitHub PR/session correlation via `X-Token-Governor-GitHub-Repo` and `X-Token-Governor-GitHub-PR` request headers.
 - MCP/tool-call cost attribution: tool names and tool-call counts are recorded when present in request or response payloads.
-- repeated file/context detection: repeated file-context fingerprints can raise `repeated_context`.
-- cost-per-merged-PR reports: `/reports/pull-requests` groups spend by PR correlation headers.
+- Repeated file/context detection: repeated file-context fingerprints can raise `repeated_context`.
+- Cost-per-PR reports: `/reports/pull-requests` groups spend by PR correlation headers.
+- Docker Compose deployment: `docker compose up --build`.
+- CSV/JSON exports at `/exports/usage.csv` and `/exports/usage.json`.
+- Prometheus-style metrics at `/metrics`.
+
+Planned:
+
+- streaming support
 - per-team approval workflows
-- Docker Compose deployment: `docker compose up --build` is available.
 - hosted dashboard mode
-- export to CSV/JSON: `/exports/usage.csv` and `/exports/usage.json` are available.
-- Prometheus/OpenTelemetry support: `/metrics` exposes basic Prometheus-style metrics; OpenTelemetry remains future work.
+- OpenTelemetry support
 
 ## License
 

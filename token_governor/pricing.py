@@ -11,6 +11,10 @@ DEFAULT_MODEL_PRICING: dict[str, dict[str, float]] = {
 FALLBACK_MODEL_PRICING = {"input_per_1m": 1.00, "output_per_1m": 3.00}
 
 
+def has_model_pricing(model: str) -> bool:
+    return model in DEFAULT_MODEL_PRICING
+
+
 def get_model_pricing(model: str) -> dict[str, float]:
     return DEFAULT_MODEL_PRICING.get(model, FALLBACK_MODEL_PRICING)
 

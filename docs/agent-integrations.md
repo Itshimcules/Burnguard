@@ -16,7 +16,7 @@ Start in mock mode while wiring up an agent. Mock mode records metering data wit
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .[dev]
+pip install -e ".[dev]"
 cp .env.example .env
 python -m token_governor seed-demo
 uvicorn token_governor.main:app --reload

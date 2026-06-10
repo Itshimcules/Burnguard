@@ -3,21 +3,22 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from contextlib import asynccontextmanager
 from csv import DictWriter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any, AsyncIterator, Awaitable, Callable
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .alerts import send_alert
 from .attribution import count_tool_calls, extract_tool_names, file_context_hash
-from .auth import AuthError, validate_virtual_key
+from .auth import AuthError, ModelNotAllowedError, validate_virtual_key
 from .budget import check_budget
 from .classifier import classify_request
 from .config import get_settings
@@ -36,7 +37,16 @@ from .proxy import (
 from .risk_flags import compute_warning_flags
 
 settings = get_settings()
-app = FastAPI(title="Burnguard", description="Guardrails for shared LLM API usage", version="0.1.0")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    with connect(settings) as conn:
+        init_db(conn)
+    yield
+
+
+app = FastAPI(title="Burnguard", description="Guardrails for shared LLM API usage", version="0.1.0", lifespan=lifespan)
 package_dir = Path(__file__).parent
 templates = Jinja2Templates(directory=str(package_dir / "templates"))
 app.mount("/static", StaticFiles(directory=str(package_dir / "static")), name="static")
@@ -61,12 +71,6 @@ class MeteredRequestSpec:
     context_hash: str | None = None
 
 
-@app.on_event("startup")
-def startup() -> None:
-    with connect(settings) as conn:
-        init_db(conn)
-
-
 def _unsupported_streaming_response() -> JSONResponse:
     return JSONResponse(
         status_code=400,
@@ -76,6 +80,44 @@ def _unsupported_streaming_response() -> JSONResponse:
                 "type": "unsupported_feature",
             }
         },
+    )
+
+
+async def _read_payload(request: Request) -> dict | JSONResponse:
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = None
+    if not isinstance(payload, dict):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": {
+                    "message": "Request body must be a valid JSON object.",
+                    "type": "invalid_request_error",
+                }
+            },
+        )
+    return payload
+
+
+def _wants_streaming(payload: dict) -> bool:
+    value = payload.get("stream")
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return False
+
+
+def _auth_error_response(exc: AuthError) -> JSONResponse:
+    if isinstance(exc, ModelNotAllowedError):
+        status_code, error_type, code = 403, "invalid_request_error", "model_not_allowed"
+    else:
+        status_code, error_type, code = 401, "authentication_error", "invalid_api_key"
+    return JSONResponse(
+        status_code=status_code,
+        content={"error": {"message": str(exc), "type": error_type, "code": code}},
     )
 
 
@@ -199,7 +241,7 @@ async def _handle_metered_request(spec: MeteredRequestSpec, authorization: str |
             insert_usage(conn, record)
             conn.commit()
             await send_alert(record, settings)
-            raise HTTPException(status_code=401, detail=str(exc)) from exc
+            return _auth_error_response(exc)
 
         decision = check_budget(conn, virtual_key, spec.model, spec.input_tokens, spec.estimated_output_tokens)
         flags = compute_warning_flags(
@@ -271,9 +313,10 @@ async def _handle_metered_request(spec: MeteredRequestSpec, authorization: str |
     tool_names = sorted(set((spec.tool_names or []) + extract_tool_names(provider_response)))
     tool_call_count = count_tool_calls(spec.payload, provider_response)
     cost = estimate_cost(spec.model, actual_input, actual_output)
+    # Reuse the key validated before forwarding: re-validating here would 500
+    # (and drop the usage record) if the key was disabled mid-request.
     with connect(settings) as conn:
         init_db(conn)
-        virtual_key = validate_virtual_key(conn, authorization, model=spec.model)
         record = _usage_record(
             request_id=request_id,
             started=started,
@@ -323,8 +366,10 @@ async def chat_completions(
     github_pr: str | None = Header(default=None, alias="X-Token-Governor-GitHub-PR"),
     user_agent: str | None = Header(default=None, alias="User-Agent"),
 ) -> JSONResponse:
-    payload = await request.json()
-    if payload.get("stream") is True:
+    payload = await _read_payload(request)
+    if isinstance(payload, JSONResponse):
+        return payload
+    if _wants_streaming(payload):
         return _unsupported_streaming_response()
 
     messages = payload.get("messages", [])
@@ -356,8 +401,10 @@ async def responses(
     github_pr: str | None = Header(default=None, alias="X-Token-Governor-GitHub-PR"),
     user_agent: str | None = Header(default=None, alias="User-Agent"),
 ) -> JSONResponse:
-    payload = await request.json()
-    if payload.get("stream") is True:
+    payload = await _read_payload(request)
+    if isinstance(payload, JSONResponse):
+        return payload
+    if _wants_streaming(payload):
         return _unsupported_streaming_response()
 
     prompt_material = {"instructions": payload.get("instructions"), "input": payload.get("input")}
@@ -390,8 +437,10 @@ async def anthropic_messages(
     github_pr: str | None = Header(default=None, alias="X-Token-Governor-GitHub-PR"),
     user_agent: str | None = Header(default=None, alias="User-Agent"),
 ) -> JSONResponse:
-    payload = await request.json()
-    if payload.get("stream") is True:
+    payload = await _read_payload(request)
+    if isinstance(payload, JSONResponse):
+        return payload
+    if _wants_streaming(payload):
         return _unsupported_streaming_response()
 
     prompt_material = {"system": payload.get("system"), "messages": payload.get("messages", [])}

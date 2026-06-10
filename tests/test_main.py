@@ -315,3 +315,90 @@ def test_anthropic_messages_rejects_streaming_requests():
             "type": "unsupported_feature",
         }
     }
+
+
+def test_chat_completions_rejects_streaming_requested_as_string():
+    client = TestClient(app)
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={"model": "gpt-4o-mini", "stream": "true", "messages": [{"role": "user", "content": "hello"}]},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["type"] == "unsupported_feature"
+
+
+def test_malformed_json_returns_openai_shaped_400():
+    client = TestClient(app)
+
+    response = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer tg_sk_demo", "Content-Type": "application/json"},
+        content="not json",
+    )
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["error"]["type"] == "invalid_request_error"
+    assert body["error"]["message"]
+
+
+def test_unknown_key_returns_openai_shaped_401(monkeypatch, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'auth401.db'}"
+    test_settings = Settings(database_url=database_url)
+    monkeypatch.setattr(main_module, "settings", test_settings)
+
+    client = TestClient(app)
+    response = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer tg_sk_does_not_exist"},
+        json={"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "hello"}]},
+    )
+
+    assert response.status_code == 401
+    body = response.json()
+    assert body["error"]["type"] == "authentication_error"
+    assert body["error"]["code"] == "invalid_api_key"
+
+
+def test_disallowed_model_returns_openai_shaped_403(monkeypatch, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'auth403.db'}"
+    test_settings = Settings(database_url=database_url)
+    monkeypatch.setattr(main_module, "settings", test_settings)
+    with connect(test_settings) as conn:
+        init_db(conn)
+        create_virtual_key(conn, VirtualKey(None, "tg_sk_limited", "Limited", "demo", ["gpt-4o-mini"], 5, 100, 1))
+        conn.commit()
+
+    client = TestClient(app)
+    response = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer tg_sk_limited"},
+        json={"model": "gpt-4.1", "messages": [{"role": "user", "content": "hello"}]},
+    )
+
+    assert response.status_code == 403
+    body = response.json()
+    assert body["error"]["type"] == "invalid_request_error"
+    assert body["error"]["code"] == "model_not_allowed"
+
+
+def test_unreachable_alert_webhook_does_not_break_blocked_response(monkeypatch, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'deadhook.db'}"
+    test_settings = Settings(database_url=database_url, slack_webhook_url="http://127.0.0.1:9/unreachable")
+    monkeypatch.setattr(main_module, "settings", test_settings)
+    with connect(test_settings) as conn:
+        init_db(conn)
+        create_virtual_key(conn, VirtualKey(None, "tg_sk_deadhook", "Deadhook", "demo", ["gpt-4.1"], 5, 100, 0.000001))
+        conn.commit()
+
+    client = TestClient(app)
+    response = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer tg_sk_deadhook"},
+        json={"model": "gpt-4.1", "messages": [{"role": "user", "content": "Use a large request."}], "max_tokens": 1000},
+    )
+
+    assert response.status_code == 402
+    assert response.json()["error"]["type"] == "budget_exceeded"
