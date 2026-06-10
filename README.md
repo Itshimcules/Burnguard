@@ -4,6 +4,8 @@
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
+![Burnguard hero image](docs/assets/brand/burnguard-readme-hero.svg)
+
 **Meter shared LLM API usage before coding agents turn curiosity into invoices.**
 
 Coding agents are useful until one loops against a shared provider key and the bill only says "API usage." Burnguard gives teams a local gateway that shows which key, project, model, session, and request pattern drove the spend.
@@ -11,10 +13,6 @@ Coding agents are useful until one loops against a shared provider key and the b
 Point Hermes Agent, OpenClaw, or any OpenAI-compatible client at Burnguard. It issues virtual keys, checks budgets before forwarding, records request/session cost, and flags risky behavior like repeated prompts, large context, expensive models, and possible agent loops.
 
 > **Working prototype:** Burnguard is intentionally small and local-first. Treat it as an MVP for exploration, demos, and feedback rather than production infrastructure.
-
-![Burnguard dashboard preview](docs/dashboard-preview.svg)
-
-![Burnguard dashboard demo](docs/assets/demo/burnguard-dashboard-demo.gif)
 
 Local demo data includes 3 virtual keys, 16 metered requests, a runaway session, and a blocked request.
 

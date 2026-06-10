@@ -1,0 +1,56 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+  <title id="title">Burnguard README hero</title>
+  <desc id="desc">A dark editorial hero image for Burnguard with abstract light and the headline Your agent stopped before the bill did.</desc>
+  <defs>
+    <radialGradient id="ember" cx="50%" cy="100%" r="72%">
+      <stop offset="0%" stop-color="#ff6b2b"/>
+      <stop offset="34%" stop-color="#ffd36a"/>
+      <stop offset="62%" stop-color="#b85cff"/>
+      <stop offset="100%" stop-color="#07090d" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cool" cx="17%" cy="86%" r="58%">
+      <stop offset="0%" stop-color="#a6f3ff"/>
+      <stop offset="44%" stop-color="#17475a" stop-opacity=".65"/>
+      <stop offset="100%" stop-color="#07090d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="veil" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#141821"/>
+      <stop offset="54%" stop-color="#080a0f"/>
+      <stop offset="100%" stop-color="#120d12"/>
+    </linearGradient>
+    <filter id="soften" x="-20%" y="-50%" width="140%" height="190%">
+      <feGaussianBlur stdDeviation="34"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="560" fill="#080a0f"/>
+  <rect x="18" y="18" width="1164" height="524" rx="10" fill="url(#veil)" stroke="#1e2634" stroke-width="1"/>
+
+  <g filter="url(#soften)" opacity=".88">
+    <path d="M145 535 C280 394 364 443 480 319 C560 233 628 295 704 212 C789 119 894 155 1007 74 L1114 542 Z" fill="url(#ember)"/>
+    <path d="M39 553 C184 405 306 471 427 326 C507 230 594 262 667 153 C735 51 835 36 1036 28 L1139 559 Z" fill="url(#cool)" opacity=".44"/>
+    <path d="M348 560 C431 450 510 454 578 354 C641 261 728 276 801 186 C860 113 961 121 1084 74 L1185 560 Z" fill="#ff8352" opacity=".34"/>
+  </g>
+
+  <g opacity=".55">
+    <path d="M120 92 H1080" stroke="#283241" stroke-width="1"/>
+    <path d="M120 466 H1080" stroke="#283241" stroke-width="1"/>
+  </g>
+
+  <g text-anchor="middle">
+    <text x="600" y="254" fill="#f7f0e8" font-family="Georgia, 'Times New Roman', serif" font-size="78" font-weight="500">Your agent stopped</text>
+    <text x="600" y="336" fill="#f7f0e8" font-family="Georgia, 'Times New Roman', serif" font-size="78" font-weight="500">before the bill did.</text>
+    <text x="600" y="383" fill="#b9c1ca" font-family="Inter, Arial, sans-serif" font-size="25">Meter shared LLM usage before one loop becomes an invoice.</text>
+  </g>
+
+  <g transform="translate(332 430)" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">
+    <rect x="0" y="0" width="150" height="44" rx="22" fill="#fff7ed" fill-opacity=".95"/>
+    <text x="75" y="29" text-anchor="middle" fill="#17202c">Virtual keys</text>
+    <rect x="168" y="0" width="132" height="44" rx="22" fill="#eef7ff" fill-opacity=".95"/>
+    <text x="234" y="29" text-anchor="middle" fill="#17202c">Budgets</text>
+    <rect x="318" y="0" width="136" height="44" rx="22" fill="#f6efff" fill-opacity=".95"/>
+    <text x="386" y="29" text-anchor="middle" fill="#17202c">Sessions</text>
+    <rect x="472" y="0" width="132" height="44" rx="22" fill="#fff7ed" fill-opacity=".95"/>
+    <text x="538" y="29" text-anchor="middle" fill="#17202c">Alerts</text>
+  </g>
+</svg>
