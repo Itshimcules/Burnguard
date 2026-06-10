@@ -24,8 +24,6 @@ Built with FastAPI, SQLite, Jinja, OpenAI-compatible routing, Anthropic Messages
 
 Burnguard is a local AI API gateway for teams experimenting with coding agents and shared model accounts. Instead of handing every tool the real provider key, you hand it a Burnguard virtual key:
 
-![Burnguard architecture: AI tools send requests through Burnguard to model providers](docs/assets/brand/burnguard-architecture.svg)
-
 You get a practical control plane before the provider invoice arrives:
 
 | Feature | Why it matters |
