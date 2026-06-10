@@ -46,6 +46,9 @@ class Settings:
     discord_webhook_url: str = ""
     alert_on_blocked: bool = True
     alert_on_warning_flags: bool = False
+    admin_token: str = ""
+    model_pricing_file: str = ""
+    default_requests_per_minute: int = 0
 
     @property
     def sqlite_path(self) -> str:
@@ -82,4 +85,7 @@ def get_settings() -> Settings:
         discord_webhook_url=os.getenv("DISCORD_WEBHOOK_URL", ""),
         alert_on_blocked=_bool("ALERT_ON_BLOCKED", True),
         alert_on_warning_flags=_bool("ALERT_ON_WARNING_FLAGS", False),
+        admin_token=os.getenv("ADMIN_TOKEN", ""),
+        model_pricing_file=os.getenv("MODEL_PRICING_FILE", ""),
+        default_requests_per_minute=int(os.getenv("DEFAULT_REQUESTS_PER_MINUTE", "0")),
     )

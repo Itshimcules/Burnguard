@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import json
+import secrets
 import time
 import uuid
 from contextlib import asynccontextmanager
 from csv import DictWriter
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable
 
-from fastapi import FastAPI, Header, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -22,11 +24,21 @@ from .auth import AuthError, ModelNotAllowedError, validate_virtual_key
 from .budget import check_budget
 from .classifier import classify_request
 from .config import get_settings
-from .db import connect, init_db, insert_usage, list_virtual_keys
+from .db import (
+    connect,
+    get_virtual_key_by_id,
+    init_db,
+    insert_usage,
+    list_virtual_keys,
+    requests_since,
+    set_virtual_key_enabled,
+    update_usage,
+)
 from .models import UsageRecord, VirtualKey
 from .pricing import estimate_cost
 from .privacy import safe_preview, stable_hash
 from .proxy import (
+    UpstreamError,
     estimate_anthropic_input_tokens,
     estimate_message_tokens,
     estimate_response_input_tokens,
@@ -35,6 +47,7 @@ from .proxy import (
     forward_response,
 )
 from .risk_flags import compute_warning_flags
+from .streaming import StreamUsage, open_stream, route_kind
 
 settings = get_settings()
 
@@ -69,18 +82,6 @@ class MeteredRequestSpec:
     github_pr: str | None = None
     tool_names: list[str] | None = None
     context_hash: str | None = None
-
-
-def _unsupported_streaming_response() -> JSONResponse:
-    return JSONResponse(
-        status_code=400,
-        content={
-            "error": {
-                "message": "Streaming is not supported in this MVP.",
-                "type": "unsupported_feature",
-            }
-        },
-    )
 
 
 async def _read_payload(request: Request) -> dict | JSONResponse:
@@ -118,6 +119,24 @@ def _auth_error_response(exc: AuthError) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
         content={"error": {"message": str(exc), "type": error_type, "code": code}},
+    )
+
+
+_basic_auth = HTTPBasic(auto_error=False)
+
+
+def require_admin(credentials: HTTPBasicCredentials | None = Depends(_basic_auth)) -> None:
+    """When ADMIN_TOKEN is set, protect the dashboard/exports with HTTP Basic auth
+    (any username, password = token). When unset, Burnguard stays open local-first."""
+    token = settings.admin_token
+    if not token:
+        return
+    if credentials is not None and secrets.compare_digest(credentials.password.encode(), token.encode()):
+        return
+    raise HTTPException(
+        status_code=401,
+        detail="Admin authentication required",
+        headers={"WWW-Authenticate": "Basic"},
     )
 
 
@@ -199,7 +218,31 @@ def _usage_record(
     )
 
 
-async def _handle_metered_request(spec: MeteredRequestSpec, authorization: str | None, user_agent: str | None) -> JSONResponse:
+@dataclass
+class PreparedRequest:
+    request_id: str
+    started: float
+    virtual_key: VirtualKey
+    flags: list[str]
+    category: str
+    prompt_hash: str
+    prompt_preview: str
+    raw_prompt: Any
+
+
+def _finalize_usage(record: UsageRecord) -> None:
+    conn = connect(settings)
+    try:
+        init_db(conn)
+        update_usage(conn, record)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+async def _prepare_metered_request(
+    spec: MeteredRequestSpec, authorization: str | None, user_agent: str | None
+) -> PreparedRequest | JSONResponse:
     started = time.perf_counter()
     request_id = f"tg_req_{uuid.uuid4().hex}"
     prompt_hash = stable_hash(spec.prompt_material)
@@ -207,148 +250,290 @@ async def _handle_metered_request(spec: MeteredRequestSpec, authorization: str |
     prompt_preview = safe_preview(spec.prompt_material)
     raw_prompt = spec.prompt_material if settings.store_raw_messages else None
 
-    with connect(settings) as conn:
-        init_db(conn)
-        try:
-            virtual_key = validate_virtual_key(conn, authorization, model=spec.model)
-        except AuthError as exc:
-            record = _usage_record(
-                request_id=request_id,
-                started=started,
-                route_path=spec.route_path,
-                virtual_key=None,
-                session_id=spec.session_id,
-                provider="unknown",
-                model=spec.model,
-                input_tokens=spec.input_tokens,
-                output_tokens=0,
-                cost=0,
-                status="blocked",
-                block_reason="auth_failed",
-                user_agent=user_agent,
-                category=category,
-                warning_flags=[],
-                prompt_hash=prompt_hash,
-                response_hash=None,
-                prompt_preview=prompt_preview,
-                response_preview=None,
-                raw_messages=raw_prompt,
-                github_repo=spec.github_repo,
-                github_pr=spec.github_pr,
-                tool_names=spec.tool_names,
-                context_hash=spec.context_hash,
-            )
-            insert_usage(conn, record)
-            conn.commit()
-            await send_alert(record, settings)
-            return _auth_error_response(exc)
-
-        decision = check_budget(conn, virtual_key, spec.model, spec.input_tokens, spec.estimated_output_tokens)
-        flags = compute_warning_flags(
-            conn,
-            session_id=spec.session_id,
-            prompt_hash=prompt_hash,
-            model=spec.model,
-            input_tokens=spec.input_tokens,
-            estimated_cost_usd=decision.estimated_request_cost,
-            category=category,
-            virtual_key=virtual_key,
-            daily_spend_usd=decision.daily_spend,
-            context_hash=spec.context_hash,
-            settings=settings,
-        )
-        if not decision.allowed:
-            record = _usage_record(
-                request_id=request_id,
-                started=started,
-                route_path=spec.route_path,
-                virtual_key=virtual_key,
-                session_id=spec.session_id,
-                provider=virtual_key.provider,
-                model=spec.model,
-                input_tokens=spec.input_tokens,
-                output_tokens=0,
-                cost=decision.estimated_request_cost,
-                status="blocked",
-                block_reason=decision.reason,
-                user_agent=user_agent,
-                category=category,
-                warning_flags=flags,
-                prompt_hash=prompt_hash,
-                response_hash=None,
-                prompt_preview=prompt_preview,
-                response_preview=None,
-                raw_messages=raw_prompt,
-                github_repo=spec.github_repo,
-                github_pr=spec.github_pr,
-                tool_names=spec.tool_names,
-                context_hash=spec.context_hash,
-            )
-            insert_usage(conn, record)
-            conn.commit()
-            await send_alert(record, settings)
-            return JSONResponse(
-                status_code=402,
-                content={
-                    "error": {
-                        "message": "Request blocked by Burnguard budget policy.",
-                        "type": "budget_exceeded",
-                        "details": decision.details,
-                    }
-                },
-            )
-
-    try:
-        provider_response, actual_input, actual_output = await spec.forwarder(spec.payload, settings)
-        status = "allowed"
-        block_reason = None
-    except Exception as exc:
-        provider_response = {"error": {"message": str(exc), "type": "provider_error"}}
-        actual_input = spec.input_tokens
-        actual_output = 0
-        status = "errored"
-        block_reason = "provider_error"
-
-    response_text = _response_text(provider_response)
-    tool_names = sorted(set((spec.tool_names or []) + extract_tool_names(provider_response)))
-    tool_call_count = count_tool_calls(spec.payload, provider_response)
-    cost = estimate_cost(spec.model, actual_input, actual_output)
-    # Reuse the key validated before forwarding: re-validating here would 500
-    # (and drop the usage record) if the key was disabled mid-request.
-    with connect(settings) as conn:
-        init_db(conn)
-        record = _usage_record(
+    def blocked(virtual_key: VirtualKey | None, reason: str, flags: list[str], cost: float = 0.0) -> UsageRecord:
+        return _usage_record(
             request_id=request_id,
             started=started,
             route_path=spec.route_path,
             virtual_key=virtual_key,
             session_id=spec.session_id,
-            provider=virtual_key.provider,
+            provider=virtual_key.provider if virtual_key else "unknown",
             model=spec.model,
-            input_tokens=actual_input,
-            output_tokens=actual_output,
+            input_tokens=spec.input_tokens,
+            output_tokens=0,
             cost=cost,
-            status=status,
-            block_reason=block_reason,
+            status="blocked",
+            block_reason=reason,
             user_agent=user_agent,
             category=category,
             warning_flags=flags,
             prompt_hash=prompt_hash,
-            response_hash=stable_hash(response_text),
+            response_hash=None,
             prompt_preview=prompt_preview,
-            response_preview=safe_preview(response_text),
+            response_preview=None,
             raw_messages=raw_prompt,
-            raw_response=provider_response if settings.store_raw_messages else None,
             github_repo=spec.github_repo,
             github_pr=spec.github_pr,
-            tool_call_count=tool_call_count,
-            tool_names=tool_names,
+            tool_names=spec.tool_names,
             context_hash=spec.context_hash,
         )
-        insert_usage(conn, record)
-        conn.commit()
+
+    alert_record: UsageRecord | None = None
+    error_response: JSONResponse | None = None
+    prepared: PreparedRequest | None = None
+
+    conn = connect(settings)
+    try:
+        init_db(conn)
+        # One immediate transaction makes the budget check and the spend
+        # reservation atomic: concurrent requests for the same key serialize
+        # here instead of all passing the check before any record lands.
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            try:
+                virtual_key = validate_virtual_key(conn, authorization, model=spec.model)
+            except AuthError as exc:
+                alert_record = blocked(None, "auth_failed", [])
+                insert_usage(conn, alert_record)
+                error_response = _auth_error_response(exc)
+            else:
+                rpm = virtual_key.requests_per_minute or 0
+                recent = 0
+                if rpm > 0:
+                    window_start = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+                    recent = requests_since(conn, virtual_key.id or -1, window_start)
+                if rpm > 0 and recent >= rpm:
+                    alert_record = blocked(virtual_key, "rate_limit_exceeded", [])
+                    insert_usage(conn, alert_record)
+                    error_response = JSONResponse(
+                        status_code=429,
+                        content={
+                            "error": {
+                                "message": "Request blocked by Burnguard rate limit policy.",
+                                "type": "rate_limit_error",
+                                "code": "rate_limit_exceeded",
+                                "details": {"requests_per_minute": rpm, "recent_requests": recent},
+                            }
+                        },
+                    )
+                else:
+                    decision = check_budget(conn, virtual_key, spec.model, spec.input_tokens, spec.estimated_output_tokens)
+                    flags = compute_warning_flags(
+                        conn,
+                        session_id=spec.session_id,
+                        prompt_hash=prompt_hash,
+                        model=spec.model,
+                        input_tokens=spec.input_tokens,
+                        estimated_cost_usd=decision.estimated_request_cost,
+                        category=category,
+                        virtual_key=virtual_key,
+                        daily_spend_usd=decision.daily_spend,
+                        context_hash=spec.context_hash,
+                        settings=settings,
+                    )
+                    if not decision.allowed:
+                        alert_record = blocked(virtual_key, decision.reason or "budget_exceeded", flags, cost=decision.estimated_request_cost)
+                        insert_usage(conn, alert_record)
+                        error_response = JSONResponse(
+                            status_code=402,
+                            content={
+                                "error": {
+                                    "message": "Request blocked by Burnguard budget policy.",
+                                    "type": "budget_exceeded",
+                                    "details": decision.details,
+                                }
+                            },
+                        )
+                    else:
+                        # Reserve the estimated spend with a 'pending' row; it is
+                        # updated with actual usage after the provider responds.
+                        pending = _usage_record(
+                            request_id=request_id,
+                            started=started,
+                            route_path=spec.route_path,
+                            virtual_key=virtual_key,
+                            session_id=spec.session_id,
+                            provider=virtual_key.provider,
+                            model=spec.model,
+                            input_tokens=spec.input_tokens,
+                            output_tokens=spec.estimated_output_tokens,
+                            cost=decision.estimated_request_cost,
+                            status="pending",
+                            block_reason=None,
+                            user_agent=user_agent,
+                            category=category,
+                            warning_flags=flags,
+                            prompt_hash=prompt_hash,
+                            response_hash=None,
+                            prompt_preview=prompt_preview,
+                            response_preview=None,
+                            raw_messages=raw_prompt,
+                            github_repo=spec.github_repo,
+                            github_pr=spec.github_pr,
+                            tool_names=spec.tool_names,
+                            context_hash=spec.context_hash,
+                        )
+                        insert_usage(conn, pending)
+                        prepared = PreparedRequest(
+                            request_id=request_id,
+                            started=started,
+                            virtual_key=virtual_key,
+                            flags=flags,
+                            category=category,
+                            prompt_hash=prompt_hash,
+                            prompt_preview=prompt_preview,
+                            raw_prompt=raw_prompt,
+                        )
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.close()
+
+    if alert_record is not None:
+        await send_alert(alert_record, settings)
+    if error_response is not None:
+        return error_response
+    assert prepared is not None
+    return prepared
+
+
+async def _handle_metered_request(spec: MeteredRequestSpec, authorization: str | None, user_agent: str | None) -> JSONResponse:
+    prepared = await _prepare_metered_request(spec, authorization, user_agent)
+    if isinstance(prepared, JSONResponse):
+        return prepared
+
+    response_status = 200
+    try:
+        provider_response, actual_input, actual_output = await spec.forwarder(spec.payload, settings)
+        status, block_reason = "allowed", None
+    except UpstreamError as exc:
+        # Pass the upstream error through verbatim: agents rely on 429/400
+        # bodies for backoff and context-length handling.
+        provider_response = exc.body
+        actual_input, actual_output = spec.input_tokens, 0
+        status, block_reason = "errored", "upstream_error"
+        response_status = exc.status_code
+    except Exception as exc:
+        provider_response = {"error": {"message": str(exc), "type": "provider_error"}}
+        actual_input, actual_output = spec.input_tokens, 0
+        status, block_reason = "errored", "provider_error"
+        response_status = 502
+
+    response_text = _response_text(provider_response)
+    tool_names = sorted(set((spec.tool_names or []) + extract_tool_names(provider_response)))
+    tool_call_count = count_tool_calls(spec.payload, provider_response)
+    cost = estimate_cost(spec.model, actual_input, actual_output)
+    record = _usage_record(
+        request_id=prepared.request_id,
+        started=prepared.started,
+        route_path=spec.route_path,
+        virtual_key=prepared.virtual_key,
+        session_id=spec.session_id,
+        provider=prepared.virtual_key.provider,
+        model=spec.model,
+        input_tokens=actual_input,
+        output_tokens=actual_output,
+        cost=cost,
+        status=status,
+        block_reason=block_reason,
+        user_agent=user_agent,
+        category=prepared.category,
+        warning_flags=prepared.flags,
+        prompt_hash=prepared.prompt_hash,
+        response_hash=stable_hash(response_text),
+        prompt_preview=prepared.prompt_preview,
+        response_preview=safe_preview(response_text),
+        raw_messages=prepared.raw_prompt,
+        raw_response=provider_response if settings.store_raw_messages else None,
+        github_repo=spec.github_repo,
+        github_pr=spec.github_pr,
+        tool_call_count=tool_call_count,
+        tool_names=tool_names,
+        context_hash=spec.context_hash,
+    )
+    _finalize_usage(record)
     await send_alert(record, settings)
-    return JSONResponse(status_code=200 if status == "allowed" else 502, content=provider_response)
+    return JSONResponse(status_code=response_status, content=provider_response)
+
+
+def _stream_final_record(
+    spec: MeteredRequestSpec,
+    prepared: PreparedRequest,
+    usage: StreamUsage,
+    *,
+    status: str,
+    block_reason: str | None,
+    user_agent: str | None,
+) -> UsageRecord:
+    input_tokens = usage.final_input_tokens
+    output_tokens = usage.final_output_tokens
+    response_text = usage.response_text
+    cost = estimate_cost(spec.model, input_tokens, output_tokens)
+    return _usage_record(
+        request_id=prepared.request_id,
+        started=prepared.started,
+        route_path=spec.route_path,
+        virtual_key=prepared.virtual_key,
+        session_id=spec.session_id,
+        provider=prepared.virtual_key.provider,
+        model=spec.model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost=cost,
+        status=status,
+        block_reason=block_reason,
+        user_agent=user_agent,
+        category=prepared.category,
+        warning_flags=prepared.flags,
+        prompt_hash=prepared.prompt_hash,
+        response_hash=stable_hash(response_text) if response_text else None,
+        prompt_preview=prepared.prompt_preview,
+        response_preview=safe_preview(response_text) if response_text else None,
+        raw_messages=prepared.raw_prompt,
+        raw_response={"streamed_text": response_text} if settings.store_raw_messages and response_text else None,
+        github_repo=spec.github_repo,
+        github_pr=spec.github_pr,
+        tool_call_count=count_tool_calls(spec.payload),
+        tool_names=spec.tool_names,
+        context_hash=spec.context_hash,
+    )
+
+
+async def _handle_streaming_request(spec: MeteredRequestSpec, authorization: str | None, user_agent: str | None) -> Response:
+    prepared = await _prepare_metered_request(spec, authorization, user_agent)
+    if isinstance(prepared, JSONResponse):
+        return prepared
+
+    kind = route_kind(spec.route_path)
+    usage = StreamUsage(kind, fallback_input_tokens=spec.input_tokens)
+    try:
+        stream_iter = await open_stream(kind, spec.payload, settings, usage, spec.input_tokens)
+    except UpstreamError as exc:
+        record = _stream_final_record(spec, prepared, usage, status="errored", block_reason="upstream_error", user_agent=user_agent)
+        _finalize_usage(record)
+        await send_alert(record, settings)
+        return JSONResponse(status_code=exc.status_code, content=exc.body)
+    except Exception as exc:
+        record = _stream_final_record(spec, prepared, usage, status="errored", block_reason="provider_error", user_agent=user_agent)
+        _finalize_usage(record)
+        await send_alert(record, settings)
+        return JSONResponse(status_code=502, content={"error": {"message": str(exc), "type": "provider_error"}})
+
+    async def metered() -> AsyncIterator[bytes]:
+        status, block_reason = "allowed", None
+        try:
+            async for chunk in stream_iter:
+                yield chunk
+        except Exception:
+            status, block_reason = "errored", "provider_stream_error"
+        finally:
+            record = _stream_final_record(spec, prepared, usage, status=status, block_reason=block_reason, user_agent=user_agent)
+            _finalize_usage(record)
+            await send_alert(record, settings)
+
+    return StreamingResponse(metered(), media_type="text/event-stream")
 
 
 def _correlation(repo_header: str | None, pr_header: str | None) -> tuple[str | None, str | None]:
@@ -365,12 +550,10 @@ async def chat_completions(
     github_repo: str | None = Header(default=None, alias="X-Token-Governor-GitHub-Repo"),
     github_pr: str | None = Header(default=None, alias="X-Token-Governor-GitHub-PR"),
     user_agent: str | None = Header(default=None, alias="User-Agent"),
-) -> JSONResponse:
+) -> Response:
     payload = await _read_payload(request)
     if isinstance(payload, JSONResponse):
         return payload
-    if _wants_streaming(payload):
-        return _unsupported_streaming_response()
 
     messages = payload.get("messages", [])
     repo, pr = _correlation(github_repo, github_pr)
@@ -389,6 +572,8 @@ async def chat_completions(
         tool_names=extract_tool_names(payload),
         context_hash=file_context_hash(messages),
     )
+    if _wants_streaming(payload):
+        return await _handle_streaming_request(spec, authorization, user_agent)
     return await _handle_metered_request(spec, authorization, user_agent)
 
 
@@ -400,12 +585,10 @@ async def responses(
     github_repo: str | None = Header(default=None, alias="X-Token-Governor-GitHub-Repo"),
     github_pr: str | None = Header(default=None, alias="X-Token-Governor-GitHub-PR"),
     user_agent: str | None = Header(default=None, alias="User-Agent"),
-) -> JSONResponse:
+) -> Response:
     payload = await _read_payload(request)
     if isinstance(payload, JSONResponse):
         return payload
-    if _wants_streaming(payload):
-        return _unsupported_streaming_response()
 
     prompt_material = {"instructions": payload.get("instructions"), "input": payload.get("input")}
     repo, pr = _correlation(github_repo, github_pr)
@@ -424,6 +607,8 @@ async def responses(
         tool_names=extract_tool_names(payload),
         context_hash=file_context_hash(prompt_material),
     )
+    if _wants_streaming(payload):
+        return await _handle_streaming_request(spec, authorization, user_agent)
     return await _handle_metered_request(spec, authorization, user_agent)
 
 
@@ -436,12 +621,10 @@ async def anthropic_messages(
     github_repo: str | None = Header(default=None, alias="X-Token-Governor-GitHub-Repo"),
     github_pr: str | None = Header(default=None, alias="X-Token-Governor-GitHub-PR"),
     user_agent: str | None = Header(default=None, alias="User-Agent"),
-) -> JSONResponse:
+) -> Response:
     payload = await _read_payload(request)
     if isinstance(payload, JSONResponse):
         return payload
-    if _wants_streaming(payload):
-        return _unsupported_streaming_response()
 
     prompt_material = {"system": payload.get("system"), "messages": payload.get("messages", [])}
     bearer = authorization or (f"Bearer {x_api_key}" if x_api_key else None)
@@ -461,6 +644,8 @@ async def anthropic_messages(
         tool_names=extract_tool_names(payload),
         context_hash=file_context_hash(prompt_material),
     )
+    if _wants_streaming(payload):
+        return await _handle_streaming_request(spec, bearer, user_agent)
     return await _handle_metered_request(spec, bearer, user_agent)
 
 
@@ -550,7 +735,7 @@ templates.env.globals["format_time"] = _display_time
 templates.env.globals["gateway_mode"] = lambda: settings.mode
 
 
-@app.get("/")
+@app.get("/", dependencies=[Depends(require_admin)])
 def index(request: Request):
     today = _today_start()
     month = _month_start()
@@ -571,7 +756,7 @@ def index(request: Request):
     return templates.TemplateResponse(request, "index.html", context)
 
 
-@app.get("/keys")
+@app.get("/keys", dependencies=[Depends(require_admin)])
 def keys(request: Request):
     with connect(settings) as conn:
         init_db(conn)
@@ -580,7 +765,27 @@ def keys(request: Request):
     return templates.TemplateResponse(request, "keys.html", {"request": request, "keys": rows, "spends": spends})
 
 
-@app.get("/sessions")
+@app.post("/keys/{key_id}/toggle", dependencies=[Depends(require_admin)])
+def toggle_key(key_id: int) -> RedirectResponse:
+    conn = connect(settings)
+    try:
+        init_db(conn)
+        key = get_virtual_key_by_id(conn, key_id)
+        if key is None:
+            raise HTTPException(status_code=404, detail="Unknown virtual key id")
+        set_virtual_key_enabled(conn, key_id, not key.enabled)
+        conn.commit()
+    finally:
+        conn.close()
+    return RedirectResponse(url="/keys", status_code=303)
+
+
+@app.get("/healthz")
+def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/sessions", dependencies=[Depends(require_admin)])
 def sessions(request: Request):
     rows = _rows(
         """
@@ -592,7 +797,7 @@ def sessions(request: Request):
     return templates.TemplateResponse(request, "sessions.html", {"request": request, "sessions": rows})
 
 
-@app.get("/sessions/{session_id}")
+@app.get("/sessions/{session_id}", dependencies=[Depends(require_admin)])
 def session_detail(request: Request, session_id: str):
     rows = _rows("SELECT * FROM usage_records WHERE session_id = ? ORDER BY timestamp ASC", (session_id,))
     prompt_counts: dict[str, int] = {}
@@ -613,18 +818,18 @@ def session_detail(request: Request, session_id: str):
     return templates.TemplateResponse(request, "session_detail.html", context)
 
 
-@app.get("/requests")
+@app.get("/requests", dependencies=[Depends(require_admin)])
 def requests_page(request: Request):
     rows = _rows("SELECT * FROM usage_records ORDER BY timestamp DESC LIMIT 100")
     return templates.TemplateResponse(request, "requests.html", {"request": request, "records": rows, "parse_flags": _csv_flags})
 
 
-@app.get("/exports/usage.json")
+@app.get("/exports/usage.json", dependencies=[Depends(require_admin)])
 def export_usage_json(limit: int = 1000) -> JSONResponse:
     return JSONResponse({"records": [_record_dict(row) for row in _usage_export_rows(limit)]})
 
 
-@app.get("/exports/usage.csv")
+@app.get("/exports/usage.csv", dependencies=[Depends(require_admin)])
 def export_usage_csv(limit: int = 1000) -> StreamingResponse:
     rows = [_record_dict(row) for row in _usage_export_rows(limit)]
     output = StringIO()
@@ -658,7 +863,7 @@ def export_usage_csv(limit: int = 1000) -> StreamingResponse:
     return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=burnguard-usage.csv"})
 
 
-@app.get("/reports/pull-requests")
+@app.get("/reports/pull-requests", dependencies=[Depends(require_admin)])
 def pull_request_report() -> JSONResponse:
     rows = _rows(
         """
@@ -688,7 +893,7 @@ def pull_request_report() -> JSONResponse:
     )
 
 
-@app.get("/metrics")
+@app.get("/metrics", dependencies=[Depends(require_admin)])
 def metrics() -> PlainTextResponse:
     allowed = _scalar("SELECT COUNT(*) FROM usage_records WHERE status='allowed'")
     blocked = _scalar("SELECT COUNT(*) FROM usage_records WHERE status='blocked'")

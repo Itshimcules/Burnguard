@@ -33,6 +33,7 @@ def create_key(args: argparse.Namespace) -> None:
         max_single_request_usd=args.max_request,
         provider=args.provider,
         enabled=not args.disabled,
+        requests_per_minute=args.rpm,
     )
     with connect(settings) as conn:
         init_db(conn)
@@ -163,6 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--max-request", type=float, default=get_settings().default_max_single_request_usd)
     create.add_argument("--allowed-models", default="gpt-4o-mini,gpt-4.1,claude-sonnet")
     create.add_argument("--provider", default="openai-compatible")
+    create.add_argument("--rpm", type=int, default=get_settings().default_requests_per_minute, help="Max requests per minute (0 = unlimited)")
     create.add_argument("--key")
     create.add_argument("--disabled", action="store_true")
     create.set_defaults(func=create_key)

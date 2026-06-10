@@ -16,9 +16,9 @@ Important limitations:
 - Usage records include virtual-key identifiers, owner/project metadata, model names, session ids, token estimates, costs, request status, routes, latency, user agents, risk flags, and optional correlation headers.
 - By default, Burnguard stores prompt and response hashes plus short redacted previews. It does not store full raw prompts or responses unless `STORE_RAW_MESSAGES=true` is set.
 - Redaction is best-effort and heuristic-based. Treat previews and exports as operational metadata that may still contain sensitive context.
-- The dashboard does not provide multi-user login, enterprise RBAC, tenant isolation, or production-grade access control.
-- Budget checks are guardrails, not financial guarantees. Token accounting and pricing defaults must be verified before real billing decisions. Budget checks are also not race-safe: concurrent requests can each pass the check before any of them is recorded, so a parallel burst can overshoot a budget.
-- Streaming is not supported in this MVP.
+- The dashboard supports a single optional shared admin password (`ADMIN_TOKEN`, HTTP Basic). There is no multi-user login, enterprise RBAC, or tenant isolation. With `ADMIN_TOKEN` unset, anyone who can reach the port can read keys and usage data.
+- Budget checks are guardrails, not financial guarantees. Token accounting and pricing defaults must be verified before real billing decisions. Budget checks reserve estimated spend in a single immediate SQLite transaction before forwarding, so concurrent requests serialize against the budget — but reservations are based on token estimates, so totals can still drift from provider invoices.
+- Streaming is supported. Streamed usage is metered from provider usage events when present, with character-based estimates as a fallback.
 
 ## Handling provider keys
 
@@ -32,7 +32,7 @@ Important limitations:
 Before using Burnguard with untrusted users or sensitive workloads, add controls such as:
 
 - hashed virtual keys at rest
-- authentication and authorization for the dashboard and API
+- per-user authentication and authorization beyond the shared `ADMIN_TOKEN`
 - TLS termination and network allowlists
 - secret-manager integration for provider credentials
 - stricter audit-log retention and export controls
