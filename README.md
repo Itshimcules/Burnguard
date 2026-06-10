@@ -12,7 +12,9 @@ Coding agents are useful until one loops against a shared provider key and the b
 
 Point Hermes Agent, OpenClaw, or any OpenAI-compatible client at Burnguard. It issues virtual keys, checks budgets before forwarding, records request/session cost, and flags risky behavior like repeated prompts, large context, expensive models, and possible agent loops.
 
-> **Working prototype:** Burnguard is intentionally small and local-first. Treat it as an MVP for exploration, demos, and feedback rather than production infrastructure.
+The public project name is Burnguard. The internal Python package, CLI module, environment-variable prefix, and compatibility headers still use the original `token_governor` namespace while the MVP stabilizes.
+
+> **Working prototype:** Burnguard is intentionally small and local-first. Treat it as an MVP for exploration, demos, and feedback rather than production infrastructure. See [Security Policy](SECURITY.md) before using it with sensitive data or shared keys.
 
 Local demo data includes 3 virtual keys, 16 metered requests, a runaway session, and a blocked request.
 
@@ -290,7 +292,9 @@ Included sample entries:
 }
 ```
 
-## Privacy notes
+## Privacy and security notes
+
+See [Security Policy](SECURITY.md) for the current prototype security model, key-handling guidance, and recommended hardening work before any production-style deployment.
 
 By default, Burnguard does **not** store full prompts or full responses.
 
