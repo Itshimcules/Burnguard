@@ -4,7 +4,7 @@ Burnguard is a local-first working prototype for metering LLM API usage. It is u
 
 ## Supported versions
 
-Burnguard has not published a stable security-supported release yet. Until a `v0.1.x` release line exists, security fixes are handled on the default branch only.
+Burnguard currently supports the `v0.1.x` release line. Security fixes are handled on the default branch first and may be backported to a patch release when they affect the latest `v0.1.x` tag.
 
 ## Prototype security model
 

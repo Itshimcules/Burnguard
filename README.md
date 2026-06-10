@@ -288,6 +288,8 @@ Requests for models with no pricing entry fall back to a conservative default an
 
 See [Security Policy](SECURITY.md) for the current prototype security model, key-handling guidance, and recommended hardening work before any production-style deployment.
 
+Release notes are tracked in [CHANGELOG.md](CHANGELOG.md), and the maintainer release checklist lives in [docs/release-checklist.md](docs/release-checklist.md). Soft-launch post drafts are available in [docs/launch-posts.md](docs/launch-posts.md).
+
 By default, Burnguard does **not** store full prompts or full responses.
 
 It stores:
