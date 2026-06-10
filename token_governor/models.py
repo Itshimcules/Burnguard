@@ -22,6 +22,7 @@ class VirtualKey:
     provider: str = "openai-compatible"
     enabled: bool = True
     created_at: datetime | None = None
+    requests_per_minute: int = 0
 
 
 @dataclass

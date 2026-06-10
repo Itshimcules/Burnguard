@@ -4,9 +4,36 @@ import time
 import uuid
 from typing import Any
 
+import json
+
 import httpx
 
 from .config import Settings, get_settings
+
+
+class UpstreamError(Exception):
+    """Upstream provider returned an error response that should be passed through verbatim."""
+
+    def __init__(self, status_code: int, body: dict):
+        super().__init__(f"Upstream returned HTTP {status_code}")
+        self.status_code = status_code
+        self.body = body
+
+
+def parse_error_body(raw: bytes | str) -> dict:
+    text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+    return {"error": {"message": text[:500] or "Upstream provider error", "type": "upstream_error"}}
+
+
+def raise_for_upstream(response: httpx.Response) -> None:
+    if response.status_code >= 400:
+        raise UpstreamError(response.status_code, parse_error_body(response.content))
 
 
 def _text_length(value: Any) -> int:
@@ -128,7 +155,7 @@ async def forward_chat_completion(payload: dict, settings: Settings | None = Non
     url = settings.openai_compatible_base_url.rstrip("/") + "/chat/completions"
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(url, headers=_headers(settings.openai_compatible_api_key), json=payload)
-        response.raise_for_status()
+        raise_for_upstream(response)
         data = response.json()
     usage = data.get("usage", {})
     return data, int(usage.get("prompt_tokens", input_tokens)), int(usage.get("completion_tokens", 0))
@@ -143,7 +170,7 @@ async def forward_response(payload: dict, settings: Settings | None = None) -> t
     url = settings.openai_compatible_base_url.rstrip("/") + "/responses"
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(url, headers=_headers(settings.openai_compatible_api_key), json=payload)
-        response.raise_for_status()
+        raise_for_upstream(response)
         data = response.json()
     usage = data.get("usage", {})
     return data, int(usage.get("input_tokens", input_tokens)), int(usage.get("output_tokens", 0))
@@ -163,7 +190,7 @@ async def forward_anthropic_message(payload: dict, settings: Settings | None = N
     }
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(url, headers=headers, json=payload)
-        response.raise_for_status()
+        raise_for_upstream(response)
         data = response.json()
     usage = data.get("usage", {})
     return data, int(usage.get("input_tokens", input_tokens)), int(usage.get("output_tokens", 0))

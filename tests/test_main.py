@@ -45,25 +45,31 @@ def test_dashboard_pages_render(monkeypatch, tmp_path):
     assert "No requests recorded for this session." in missing_session.text
 
 
-def test_chat_completions_rejects_streaming_requests():
-    client = TestClient(app)
+def test_chat_completions_streaming_is_metered(monkeypatch, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'stream-chat.db'}"
+    test_settings = Settings(database_url=database_url)
+    monkeypatch.setattr(main_module, "settings", test_settings)
+    with connect(test_settings) as conn:
+        init_db(conn)
+        create_virtual_key(conn, VirtualKey(None, "tg_sk_stream", "Stream", "demo", ["gpt-4o-mini"], 5, 100, 1))
+        conn.commit()
 
+    client = TestClient(app)
     response = client.post(
         "/v1/chat/completions",
-        json={
-            "model": "gpt-4o-mini",
-            "stream": True,
-            "messages": [{"role": "user", "content": "hello"}],
-        },
+        headers={"Authorization": "Bearer tg_sk_stream", "X-Token-Governor-Session": "stream-session"},
+        json={"model": "gpt-4o-mini", "stream": True, "messages": [{"role": "user", "content": "hello"}]},
     )
 
-    assert response.status_code == 400
-    assert response.json() == {
-        "error": {
-            "message": "Streaming is not supported in this MVP.",
-            "type": "unsupported_feature",
-        }
-    }
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert "data:" in response.text
+    assert "[DONE]" in response.text
+    with connect(test_settings) as conn:
+        row = conn.execute("SELECT status, estimated_output_tokens, estimated_cost_usd, session_id FROM usage_records").fetchone()
+    assert row["status"] == "allowed"
+    assert row["estimated_output_tokens"] > 0
+    assert row["session_id"] == "stream-session"
 
 
 def test_responses_api_mock_request_is_metered(monkeypatch, tmp_path):
@@ -214,21 +220,29 @@ def test_blocked_request_sends_webhook_alert(monkeypatch, tmp_path):
     assert seen == [("blocked", "max_single_request_exceeded", "https://example.invalid/slack")]
 
 
-def test_responses_api_rejects_streaming_requests():
-    client = TestClient(app)
+def test_responses_api_streaming_is_metered(monkeypatch, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'stream-resp.db'}"
+    test_settings = Settings(database_url=database_url)
+    monkeypatch.setattr(main_module, "settings", test_settings)
+    with connect(test_settings) as conn:
+        init_db(conn)
+        create_virtual_key(conn, VirtualKey(None, "tg_sk_stream_resp", "Stream", "demo", ["gpt-4o-mini"], 5, 100, 1))
+        conn.commit()
 
+    client = TestClient(app)
     response = client.post(
         "/v1/responses",
+        headers={"Authorization": "Bearer tg_sk_stream_resp"},
         json={"model": "gpt-4o-mini", "stream": True, "input": "hello"},
     )
 
-    assert response.status_code == 400
-    assert response.json() == {
-        "error": {
-            "message": "Streaming is not supported in this MVP.",
-            "type": "unsupported_feature",
-        }
-    }
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert "response.completed" in response.text
+    with connect(test_settings) as conn:
+        row = conn.execute("SELECT status, estimated_output_tokens FROM usage_records").fetchone()
+    assert row["status"] == "allowed"
+    assert row["estimated_output_tokens"] > 0
 
 
 def test_openclaw_style_responses_request_is_metered(monkeypatch, tmp_path):
@@ -300,33 +314,51 @@ def test_anthropic_messages_mock_request_accepts_x_api_key_and_is_metered(monkey
     assert row["session_id"] == "anthropic-session"
 
 
-def test_anthropic_messages_rejects_streaming_requests():
-    client = TestClient(app)
+def test_anthropic_messages_streaming_is_metered(monkeypatch, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'stream-anthropic.db'}"
+    test_settings = Settings(database_url=database_url)
+    monkeypatch.setattr(main_module, "settings", test_settings)
+    with connect(test_settings) as conn:
+        init_db(conn)
+        create_virtual_key(conn, VirtualKey(None, "tg_sk_stream_msg", "Stream", "demo", ["claude-sonnet"], 5, 100, 1, provider="anthropic"))
+        conn.commit()
 
+    client = TestClient(app)
     response = client.post(
         "/v1/messages",
-        json={"model": "claude-sonnet", "max_tokens": 64, "stream": True, "messages": []},
+        headers={"X-Api-Key": "tg_sk_stream_msg"},
+        json={"model": "claude-sonnet", "max_tokens": 64, "stream": True, "messages": [{"role": "user", "content": "hello"}]},
     )
 
-    assert response.status_code == 400
-    assert response.json() == {
-        "error": {
-            "message": "Streaming is not supported in this MVP.",
-            "type": "unsupported_feature",
-        }
-    }
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert "message_start" in response.text
+    assert "message_stop" in response.text
+    with connect(test_settings) as conn:
+        row = conn.execute("SELECT status, estimated_output_tokens, provider FROM usage_records").fetchone()
+    assert row["status"] == "allowed"
+    assert row["estimated_output_tokens"] > 0
+    assert row["provider"] == "anthropic"
 
 
-def test_chat_completions_rejects_streaming_requested_as_string():
+def test_chat_completions_streaming_requested_as_string_streams(monkeypatch, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'stream-str.db'}"
+    test_settings = Settings(database_url=database_url)
+    monkeypatch.setattr(main_module, "settings", test_settings)
+    with connect(test_settings) as conn:
+        init_db(conn)
+        create_virtual_key(conn, VirtualKey(None, "tg_sk_stream_str", "Stream", "demo", ["gpt-4o-mini"], 5, 100, 1))
+        conn.commit()
+
     client = TestClient(app)
-
     response = client.post(
         "/v1/chat/completions",
+        headers={"Authorization": "Bearer tg_sk_stream_str"},
         json={"model": "gpt-4o-mini", "stream": "true", "messages": [{"role": "user", "content": "hello"}]},
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"]["type"] == "unsupported_feature"
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
 
 
 def test_malformed_json_returns_openai_shaped_400():
@@ -402,3 +434,143 @@ def test_unreachable_alert_webhook_does_not_break_blocked_response(monkeypatch, 
 
     assert response.status_code == 402
     assert response.json()["error"]["type"] == "budget_exceeded"
+
+
+def test_rate_limit_returns_429(monkeypatch, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'rpm.db'}"
+    test_settings = Settings(database_url=database_url)
+    monkeypatch.setattr(main_module, "settings", test_settings)
+    with connect(test_settings) as conn:
+        init_db(conn)
+        create_virtual_key(conn, VirtualKey(None, "tg_sk_rpm", "Rpm", "demo", ["gpt-4o-mini"], 5, 100, 1, requests_per_minute=2))
+        conn.commit()
+
+    client = TestClient(app)
+    payload = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "hello"}]}
+    headers = {"Authorization": "Bearer tg_sk_rpm"}
+    assert client.post("/v1/chat/completions", headers=headers, json=payload).status_code == 200
+    assert client.post("/v1/chat/completions", headers=headers, json=payload).status_code == 200
+    third = client.post("/v1/chat/completions", headers=headers, json=payload)
+    assert third.status_code == 429
+    body = third.json()
+    assert body["error"]["type"] == "rate_limit_error"
+    assert body["error"]["code"] == "rate_limit_exceeded"
+    with connect(test_settings) as conn:
+        row = conn.execute("SELECT COUNT(*) AS n FROM usage_records WHERE block_reason='rate_limit_exceeded'").fetchone()
+    assert row["n"] == 1
+
+
+def test_admin_token_protects_dashboard_and_exports(monkeypatch, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'admin.db'}"
+    test_settings = Settings(database_url=database_url, admin_token="hunter2")
+    monkeypatch.setattr(main_module, "settings", test_settings)
+
+    client = TestClient(app)
+    for path in ["/", "/keys", "/sessions", "/requests", "/exports/usage.json", "/exports/usage.csv", "/reports/pull-requests", "/metrics"]:
+        denied = client.get(path)
+        assert denied.status_code == 401, path
+        assert denied.headers.get("www-authenticate") == "Basic"
+        allowed = client.get(path, auth=("admin", "hunter2"))
+        assert allowed.status_code == 200, path
+
+    # API routes and health stay open: agents authenticate with virtual keys.
+    assert client.get("/healthz").status_code == 200
+    no_key = client.post("/v1/chat/completions", json={"model": "gpt-4o-mini", "messages": []})
+    assert no_key.status_code == 401
+    assert no_key.json()["error"]["type"] == "authentication_error"
+
+
+def test_key_toggle_endpoint_disables_and_enables(monkeypatch, tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'toggle.db'}"
+    test_settings = Settings(database_url=database_url)
+    monkeypatch.setattr(main_module, "settings", test_settings)
+    with connect(test_settings) as conn:
+        init_db(conn)
+        key = create_virtual_key(conn, VirtualKey(None, "tg_sk_toggle", "Toggle", "demo", ["gpt-4o-mini"], 5, 100, 1))
+        conn.commit()
+
+    client = TestClient(app)
+    payload = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "hello"}]}
+    headers = {"Authorization": "Bearer tg_sk_toggle"}
+    assert client.post("/v1/chat/completions", headers=headers, json=payload).status_code == 200
+
+    toggled = client.post(f"/keys/{key.id}/toggle", follow_redirects=False)
+    assert toggled.status_code == 303
+    blocked = client.post("/v1/chat/completions", headers=headers, json=payload)
+    assert blocked.status_code == 401
+    assert "disabled" in blocked.json()["error"]["message"]
+
+    client.post(f"/keys/{key.id}/toggle", follow_redirects=False)
+    assert client.post("/v1/chat/completions", headers=headers, json=payload).status_code == 200
+
+    missing = client.post("/keys/9999/toggle", follow_redirects=False)
+    assert missing.status_code == 404
+
+
+def test_healthz_is_open():
+    client = TestClient(app)
+    response = client.get("/healthz")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_upstream_error_passes_through_status_and_body(monkeypatch, tmp_path):
+    from token_governor.proxy import UpstreamError
+
+    database_url = f"sqlite:///{tmp_path / 'upstream.db'}"
+    test_settings = Settings(database_url=database_url)
+    monkeypatch.setattr(main_module, "settings", test_settings)
+    with connect(test_settings) as conn:
+        init_db(conn)
+        create_virtual_key(conn, VirtualKey(None, "tg_sk_upstream", "Upstream", "demo", ["gpt-4o-mini"], 5, 100, 1))
+        conn.commit()
+
+    upstream_body = {"error": {"message": "Rate limit reached for gpt-4o-mini", "type": "rate_limit_error"}}
+
+    async def failing_forwarder(payload, settings):
+        raise UpstreamError(429, upstream_body)
+
+    monkeypatch.setattr(main_module, "forward_chat_completion", failing_forwarder)
+
+    client = TestClient(app)
+    response = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer tg_sk_upstream"},
+        json={"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "hello"}]},
+    )
+
+    assert response.status_code == 429
+    assert response.json() == upstream_body
+    with connect(test_settings) as conn:
+        row = conn.execute("SELECT status, block_reason FROM usage_records").fetchone()
+    assert row["status"] == "errored"
+    assert row["block_reason"] == "upstream_error"
+
+
+def test_budget_reservation_blocks_second_request_while_first_pending(monkeypatch, tmp_path):
+    """A 'pending' reservation must count against the budget so concurrent
+    requests cannot all pass the check before any usage is recorded."""
+    from token_governor.budget import check_budget
+    from token_governor.db import get_virtual_key, insert_usage, spend_between
+    from token_governor.models import UsageRecord
+    from datetime import datetime, timezone
+
+    database_url = f"sqlite:///{tmp_path / 'reserve.db'}"
+    test_settings = Settings(database_url=database_url)
+    with connect(test_settings) as conn:
+        init_db(conn)
+        key = create_virtual_key(conn, VirtualKey(None, "tg_sk_reserve", "Reserve", "demo", ["gpt-4o-mini"], 0.001, 100, 1))
+        conn.commit()
+        pending = UsageRecord(
+            request_id="tg_req_pending", timestamp=datetime.now(timezone.utc), virtual_key_id=key.id,
+            virtual_key=key.key, owner=key.owner, project=key.project, session_id="s", provider="openai-compatible",
+            model="gpt-4o-mini", estimated_input_tokens=1000, estimated_output_tokens=1000, total_tokens=2000,
+            estimated_cost_usd=0.0009, status="pending", block_reason=None, latency_ms=0,
+            route_path="/v1/chat/completions", user_agent=None, request_category="general_chat", warning_flags=[],
+            prompt_hash=None, response_hash=None, prompt_preview=None, response_preview=None,
+        )
+        insert_usage(conn, pending)
+        conn.commit()
+        decision = check_budget(conn, key, "gpt-4o-mini", 1000, 1000)
+    assert not decision.allowed
+    assert decision.reason == "daily_budget_exceeded"

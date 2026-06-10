@@ -29,9 +29,14 @@ def connect(settings: Settings | None = None) -> sqlite3.Connection:
     db_path = settings.sqlite_path
     if db_path != ":memory:":
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+    # isolation_level=None puts sqlite3 in autocommit mode so the budget path
+    # can manage an explicit BEGIN IMMEDIATE transaction itself.
+    conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")
+    if db_path != ":memory:":
+        conn.execute("PRAGMA journal_mode = WAL")
     return conn
 
 
@@ -46,6 +51,15 @@ def session(settings: Settings | None = None) -> Iterator[sqlite3.Connection]:
 
 
 def init_db(conn: sqlite3.Connection) -> None:
+    # executescript force-commits, which would break an explicit transaction
+    # opened by the budget path — only run it when the schema is missing.
+    exists = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='usage_records'"
+    ).fetchone()
+    if exists:
+        _ensure_usage_columns(conn)
+        _ensure_virtual_key_columns(conn)
+        return
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS virtual_keys (
@@ -59,7 +73,8 @@ def init_db(conn: sqlite3.Connection) -> None:
             max_single_request_usd REAL NOT NULL,
             provider TEXT NOT NULL DEFAULT 'openai-compatible',
             enabled INTEGER NOT NULL DEFAULT 1,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            requests_per_minute INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS usage_records (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,6 +117,13 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     _ensure_usage_columns(conn)
+    _ensure_virtual_key_columns(conn)
+
+
+def _ensure_virtual_key_columns(conn: sqlite3.Connection) -> None:
+    existing = {row["name"] for row in conn.execute("PRAGMA table_info(virtual_keys)")}
+    if "requests_per_minute" not in existing:
+        conn.execute("ALTER TABLE virtual_keys ADD COLUMN requests_per_minute INTEGER NOT NULL DEFAULT 0")
 
 
 def _ensure_usage_columns(conn: sqlite3.Connection) -> None:
@@ -133,6 +155,7 @@ def row_to_key(row: sqlite3.Row | None) -> VirtualKey | None:
         provider=row["provider"],
         enabled=bool(row["enabled"]),
         created_at=_parse_dt(row["created_at"]),
+        requests_per_minute=int(row["requests_per_minute"] or 0),
     )
 
 
@@ -145,8 +168,8 @@ def create_virtual_key(conn: sqlite3.Connection, key: VirtualKey) -> VirtualKey:
         """
         INSERT INTO virtual_keys
         (key, owner, project, allowed_models, daily_budget_usd, monthly_budget_usd,
-         max_single_request_usd, provider, enabled, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         max_single_request_usd, provider, enabled, created_at, requests_per_minute)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             key.key,
@@ -159,6 +182,7 @@ def create_virtual_key(conn: sqlite3.Connection, key: VirtualKey) -> VirtualKey:
             key.provider,
             int(key.enabled),
             _dt(key.created_at),
+            key.requests_per_minute,
         ),
     )
     key.id = cur.lastrowid
@@ -225,12 +249,62 @@ def insert_usage(conn: sqlite3.Connection, record: UsageRecord) -> None:
 
 def spend_between(conn: sqlite3.Connection, virtual_key_id: int, start_iso: str, end_iso: str) -> float:
     init_db(conn)
+    # 'pending' rows are in-flight reservations: counting them lets concurrent
+    # requests see each other's estimated spend before the provider responds.
     row = conn.execute(
         """
         SELECT COALESCE(SUM(estimated_cost_usd), 0) AS spend
         FROM usage_records
-        WHERE virtual_key_id = ? AND timestamp >= ? AND timestamp < ? AND status = 'allowed'
+        WHERE virtual_key_id = ? AND timestamp >= ? AND timestamp < ? AND status IN ('allowed', 'pending')
         """,
         (virtual_key_id, start_iso, end_iso),
     ).fetchone()
     return float(row["spend"] or 0)
+
+
+def requests_since(conn: sqlite3.Connection, virtual_key_id: int, start_iso: str) -> int:
+    init_db(conn)
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM usage_records WHERE virtual_key_id = ? AND timestamp >= ?",
+        (virtual_key_id, start_iso),
+    ).fetchone()
+    return int(row["n"] or 0)
+
+
+def set_virtual_key_enabled(conn: sqlite3.Connection, key_id: int, enabled: bool) -> None:
+    init_db(conn)
+    conn.execute("UPDATE virtual_keys SET enabled = ? WHERE id = ?", (int(enabled), key_id))
+
+
+def get_virtual_key_by_id(conn: sqlite3.Connection, key_id: int) -> VirtualKey | None:
+    init_db(conn)
+    return row_to_key(conn.execute("SELECT * FROM virtual_keys WHERE id = ?", (key_id,)).fetchone())
+
+
+def update_usage(conn: sqlite3.Connection, record: UsageRecord) -> None:
+    init_db(conn)
+    conn.execute(
+        """
+        UPDATE usage_records
+        SET estimated_input_tokens = ?, estimated_output_tokens = ?, total_tokens = ?,
+            estimated_cost_usd = ?, status = ?, block_reason = ?, latency_ms = ?,
+            response_hash = ?, response_preview = ?, raw_response = ?,
+            tool_call_count = ?, tool_names = ?
+        WHERE request_id = ?
+        """,
+        (
+            record.estimated_input_tokens,
+            record.estimated_output_tokens,
+            record.total_tokens,
+            record.estimated_cost_usd,
+            record.status,
+            record.block_reason,
+            record.latency_ms,
+            record.response_hash,
+            record.response_preview,
+            json.dumps(record.raw_response) if record.raw_response is not None else None,
+            record.tool_call_count,
+            json.dumps(record.tool_names or []),
+            record.request_id,
+        ),
+    )

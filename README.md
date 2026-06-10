@@ -91,9 +91,9 @@ Use:
 - API key: tg_sk_demo
 - Default model: gpt-4o-mini
 
-Set Hermes to use its custom OpenAI-compatible endpoint or provider option. Keep the current model if it is already allowed by the Burnguard virtual key; otherwise use gpt-4o-mini. Do not store the real upstream provider key in Hermes. If Hermes supports custom headers, add X-Token-Governor-Session with a stable value for this project run. Keep streaming disabled for now.
+Set Hermes to use its custom OpenAI-compatible endpoint or provider option. Keep the current model if it is already allowed by the Burnguard virtual key; otherwise use gpt-4o-mini. Do not store the real upstream provider key in Hermes. If Hermes supports custom headers, add X-Token-Governor-Session with a stable value for this project run. Streaming can stay enabled; Burnguard meters streamed responses.
 
-After the change, send one small non-streaming chat request, confirm Burnguard records it at http://localhost:8000/requests, and report the final base URL, model, session header status, and smoke-test result.
+After the change, send one small chat request, confirm Burnguard records it at http://localhost:8000/requests, and report the final base URL, model, session header status, and smoke-test result.
 ```
 
 Manual setup details: [Hermes Agent integration](docs/agent-integrations.md#hermes-agent).
@@ -114,9 +114,9 @@ Use:
 - API key: tg_sk_demo
 - Default model: gpt-4o-mini
 
-Use OpenClaw's custom or OpenAI-compatible API provider path, not a Codex/OAuth subscription runtime path. Keep the current model if it is already allowed by the Burnguard virtual key; otherwise use gpt-4o-mini. Do not store the real upstream provider key in OpenClaw. If OpenClaw supports custom headers, add X-Token-Governor-Session with a stable value for this project run. Keep streaming disabled for now.
+Use OpenClaw's custom or OpenAI-compatible API provider path, not a Codex/OAuth subscription runtime path. Keep the current model if it is already allowed by the Burnguard virtual key; otherwise use gpt-4o-mini. Do not store the real upstream provider key in OpenClaw. If OpenClaw supports custom headers, add X-Token-Governor-Session with a stable value for this project run. Streaming can stay enabled; Burnguard meters streamed responses.
 
-After the change, send one small non-streaming chat or responses request, confirm Burnguard records it at http://localhost:8000/requests, and report the final base URL, model, session header status, and smoke-test result.
+After the change, send one small chat or responses request, confirm Burnguard records it at http://localhost:8000/requests, and report the final base URL, model, session header status, and smoke-test result.
 ```
 
 Manual setup details: [OpenClaw integration](docs/agent-integrations.md#openclaw).
@@ -143,8 +143,8 @@ It gives teams a local MVP for visibility, simple budgets, and session-level ins
 
 - Accepts OpenAI-compatible `POST /v1/chat/completions` and `POST /v1/responses` requests, plus basic Anthropic-compatible `POST /v1/messages` requests.
 - Validates local virtual API keys such as `tg_sk_demo`.
-- Enforces daily, monthly, and max-single-request budgets before a request is forwarded.
-- Rejects unsupported streaming requests explicitly for Chat Completions, Responses, and Anthropic Messages requests.
+- Enforces daily, monthly, max-single-request budgets and optional per-key requests-per-minute limits before a request is forwarded. Estimated spend is reserved atomically so parallel bursts cannot all slip past a budget check.
+- Streams responses (SSE) for Chat Completions, Responses, and Anthropic Messages, metering usage from the stream.
 - Runs in **mock mode** by default so demos do not spend real API money.
 - Can forward to one OpenAI-compatible provider and one Anthropic Messages provider when configured.
 - Logs usage metadata to SQLite: owner, project, key, model, session, tokens, cost, status, route, latency, user-agent, category, and warning flags.
@@ -169,7 +169,6 @@ This is an MVP/prototype. It does **not** provide:
 - production-grade security claims
 - perfect token accounting
 - perfect support for every provider
-- streaming support
 
 ## Demo API request
 
@@ -192,7 +191,7 @@ The gateway returns an OpenAI-compatible response and records the request.
 
 ## Demo Responses API request
 
-Burnguard also accepts basic non-streaming OpenAI Responses API requests:
+Burnguard also accepts OpenAI Responses API requests (streaming and non-streaming):
 
 ```bash
 curl http://localhost:8000/v1/responses \
@@ -206,11 +205,11 @@ curl http://localhost:8000/v1/responses \
   }'
 ```
 
-The gateway returns an OpenAI Responses-shaped response in mock mode and records the request with the same budget and session controls as Chat Completions. Streaming Responses requests are rejected in this MVP.
+The gateway returns an OpenAI Responses-shaped response in mock mode and records the request with the same budget and session controls as Chat Completions. Add `"stream": true` to receive SSE.
 
 ## Demo Anthropic Messages request
 
-Burnguard also accepts basic non-streaming Anthropic Messages API requests. The local virtual key can be passed with Anthropic-style `x-api-key` or as an Authorization bearer token:
+Burnguard also accepts Anthropic Messages API requests (streaming and non-streaming). The local virtual key can be passed with Anthropic-style `x-api-key` or as an Authorization bearer token:
 
 ```bash
 curl http://localhost:8000/v1/messages \
@@ -226,7 +225,7 @@ curl http://localhost:8000/v1/messages \
   }'
 ```
 
-In mock mode, the gateway returns an Anthropic Messages-shaped response and records the request with the same budget, privacy, warning flag, and session controls as the OpenAI-compatible routes. Streaming Messages requests are rejected in this MVP.
+In mock mode, the gateway returns an Anthropic Messages-shaped response and records the request with the same budget, privacy, warning flag, and session controls as the OpenAI-compatible routes. Add `"stream": true` to receive Anthropic-style SSE events.
 
 ## Create a virtual key
 
@@ -239,7 +238,7 @@ python -m token_governor create-key \
   --max-request 1
 ```
 
-You can also provide `--key tg_sk_my_key`, `--allowed-models gpt-4o-mini,gpt-4.1,claude-sonnet`, and `--provider anthropic` for keys intended for Anthropic Messages routes.
+You can also provide `--key tg_sk_my_key`, `--allowed-models gpt-4o-mini,gpt-4.1,claude-sonnet`, `--rpm 30` for a requests-per-minute cap, and `--provider anthropic` for keys intended for Anthropic Messages routes.
 
 ## Budget behavior
 
@@ -268,21 +267,22 @@ Budgets are intentionally simple:
 - `monthly_budget_usd`
 - `max_single_request_usd`
 
-Before forwarding a request, Burnguard estimates input and expected output cost and blocks requests that would push the key over its daily or monthly budget. After a provider response, it records final estimated cost from returned usage when available.
+Keys can also set `--rpm` (requests per minute); requests over the cap get HTTP **429** with an OpenAI-style `rate_limit_error` body.
+
+Before forwarding a request, Burnguard estimates input and expected output cost, reserves that estimate inside a single SQLite transaction, and blocks requests that would push the key over its daily or monthly budget. After a provider response (or the end of a stream), the reservation is updated with the final estimated cost from returned usage when available.
 
 ## Pricing notes
 
-Model pricing lives in `token_governor/pricing.py`. Defaults are placeholders for demo purposes and must be verified before real use.
-
-Included sample entries:
+Model pricing lives in `token_governor/pricing.py` and includes entries for common OpenAI and Anthropic models. Prices drift — verify them against provider pricing pages before relying on budget math, and override or extend them without forking by pointing `MODEL_PRICING_FILE` at a JSON file:
 
 ```json
 {
   "gpt-4o-mini": {"input_per_1m": 0.15, "output_per_1m": 0.60},
-  "gpt-4.1": {"input_per_1m": 2.00, "output_per_1m": 8.00},
-  "claude-sonnet": {"input_per_1m": 3.00, "output_per_1m": 15.00}
+  "my-internal-model": {"input_per_1m": 0.50, "output_per_1m": 1.00}
 }
 ```
+
+Requests for models with no pricing entry fall back to a conservative default and are tagged with the `unknown_model_pricing` warning flag.
 
 ## Privacy and security notes
 
@@ -325,9 +325,14 @@ DEFAULT_MAX_SINGLE_REQUEST_USD=1
 LARGE_CONTEXT_TOKEN_THRESHOLD=50000
 LOOP_REQUEST_COUNT=10
 LOOP_WINDOW_MINUTES=15
+ADMIN_TOKEN=
+MODEL_PRICING_FILE=
+DEFAULT_REQUESTS_PER_MINUTE=0
 SLACK_WEBHOOK_URL=
 DISCORD_WEBHOOK_URL=
 ```
+
+Set `ADMIN_TOKEN` to require HTTP Basic auth (any username, password = token) on the dashboard, exports, reports, and metrics. Leave it empty for the open local-first default. `/healthz` is always open.
 
 To call real providers, set the matching upstream credentials for the route you expose:
 
@@ -366,13 +371,14 @@ Burnguard listens on `http://localhost:8000/` and stores SQLite data in the `bur
 ![Burnguard dashboard demo](docs/assets/demo/burnguard-dashboard-demo.gif)
 
 - `/` — overview: spend, requests, top users/projects/sessions/models, categories, flags, blocked requests
-- `/keys` — virtual keys and budgets
+- `/keys` — virtual keys, budgets, rate limits, and an enable/disable kill switch per key
 - `/sessions` — session list with spend totals
 - `/sessions/{session_id}` — session detail, repeated prompts, category breakdown, flags, timeline
 - `/requests` — recent request log
 - `/reports/pull-requests` — JSON spend report grouped by GitHub PR correlation headers
 - `/exports/usage.json` and `/exports/usage.csv` — usage export endpoints
 - `/metrics` — Prometheus-style text metrics
+- `/healthz` — health check (always unauthenticated)
 
 ## Development
 
@@ -386,8 +392,9 @@ uvicorn token_governor.main:app --reload
 
 Shipped:
 
-- OpenAI Responses API: basic non-streaming `POST /v1/responses` with tool metadata extraction for metering.
-- Anthropic Messages API: basic non-streaming `POST /v1/messages` with tool-use metadata extraction for metering.
+- Streaming (SSE) for Chat Completions, Responses, and Anthropic Messages, with usage metered from the stream.
+- OpenAI Responses API: `POST /v1/responses` with tool metadata extraction for metering.
+- Anthropic Messages API: `POST /v1/messages` with tool-use metadata extraction for metering.
 - Hermes Agent and OpenClaw gateway setup, documented for OpenAI-compatible routing.
 - LiteLLM integration through the OpenAI-compatible proxy base URL.
 - Slack/Discord webhook alerts for blocked requests and optional warning flags.
@@ -398,10 +405,15 @@ Shipped:
 - Docker Compose deployment: `docker compose up --build`.
 - CSV/JSON exports at `/exports/usage.csv` and `/exports/usage.json`.
 - Prometheus-style metrics at `/metrics`.
+- Key kill switch (enable/disable) from the dashboard.
+- Per-key requests-per-minute rate limits.
+- Optional `ADMIN_TOKEN` auth for the dashboard and exports.
+- Editable model pricing via `MODEL_PRICING_FILE`.
+- Upstream error passthrough in proxy mode (429/400 bodies reach the client).
+- `/healthz` endpoint.
 
 Planned:
 
-- streaming support
 - per-team approval workflows
 - hosted dashboard mode
 - OpenTelemetry support

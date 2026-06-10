@@ -2,12 +2,12 @@
 
 Burnguard can sit in front of agents that support an OpenAI-compatible API base URL. For Hermes Agent and OpenClaw, point the agent at Burnguard's local `/v1` endpoint and use a Burnguard virtual key as the API key.
 
-This first-pass integration covers non-streaming OpenAI-compatible traffic:
+This integration covers OpenAI-compatible traffic, streaming and non-streaming:
 
 - `POST /v1/chat/completions`
 - `POST /v1/responses`
 
-Streaming is intentionally rejected by the current MVP.
+Streaming responses are relayed as SSE and metered from the stream's usage events.
 
 ## Burnguard setup
 
